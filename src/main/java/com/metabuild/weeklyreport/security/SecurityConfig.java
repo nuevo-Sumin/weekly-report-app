@@ -39,7 +39,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/api/auth/**").permitAll()
                         .requestMatchers("/api/me").authenticated()
-                        .requestMatchers("/api/admin/**").authenticated()
+                        .requestMatchers("/api/admin/**").hasRole("MANAGER")
                         .requestMatchers("/api/report-items/**").authenticated()
                         .anyRequest().denyAll()
                 )
