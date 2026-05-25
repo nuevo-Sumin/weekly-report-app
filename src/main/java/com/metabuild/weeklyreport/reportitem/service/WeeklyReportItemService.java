@@ -1,10 +1,12 @@
 package com.metabuild.weeklyreport.reportitem.service;
 
+import com.metabuild.weeklyreport.reportitem.dto.AdminReportItemResponse;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemResponse;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemSubmitRequest;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
+import com.metabuild.weeklyreport.reportitem.entity.WeekType;
 import com.metabuild.weeklyreport.reportitem.repository.WeeklyReportItemRepository;
 import com.metabuild.weeklyreport.user.entity.User;
 import com.metabuild.weeklyreport.user.repository.UserRepository;
@@ -127,6 +129,30 @@ public class WeeklyReportItemService {
         return items.stream().map(ReportItemResponse::from).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<AdminReportItemResponse> getSubmittedItemsForAdmin(
+            LocalDate reportStartDate,
+            LocalDate reportEndDate,
+            String memberLoginId,
+            String unitTask,
+            WeekType weekType
+    ) {
+        if (reportStartDate.isAfter(reportEndDate)) {
+            throw new IllegalArgumentException("Report start date must be before or equal to report end date.");
+        }
+
+        return reportItemRepository.findSubmittedItemsForAdmin(
+                        reportStartDate,
+                        reportEndDate,
+                        normalizeOptional(memberLoginId),
+                        normalizeOptional(unitTask),
+                        weekType
+                )
+                .stream()
+                .map(AdminReportItemResponse::from)
+                .toList();
+    }
+
     private WeeklyReportItem getOwnedItem(String loginId, Long itemId) {
         User author = getUser(loginId);
         return reportItemRepository.findByAuthorAndId(author, itemId)
@@ -149,6 +175,13 @@ public class WeeklyReportItemService {
     }
 
     private String trim(String value) {
+        return value.trim();
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
         return value.trim();
     }
 }
