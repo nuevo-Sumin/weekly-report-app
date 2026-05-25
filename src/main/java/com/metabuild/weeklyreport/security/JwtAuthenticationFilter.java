@@ -24,8 +24,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String[] PUBLIC_PATHS = {
             "/api/health",
-            "/api/auth/",
-            "/h2-console/"
+            "/api/auth/"
     };
 
     private final JwtTokenProvider jwtTokenProvider;

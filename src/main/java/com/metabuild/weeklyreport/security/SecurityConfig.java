@@ -37,7 +37,7 @@ public class SecurityConfig {
                             objectMapper.writeValue(response.getWriter(), ApiResponse.error("Authentication is required."));
                         }))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/auth/**", "/h2-console/**").permitAll()
+                        .requestMatchers("/api/health", "/api/auth/**").permitAll()
                         .requestMatchers("/api/me").authenticated()
                         .requestMatchers("/api/report-items/**").authenticated()
                         .anyRequest().denyAll()

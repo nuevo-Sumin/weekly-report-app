@@ -1,6 +1,7 @@
 package com.metabuild.weeklyreport.auth.dto;
 
 import com.metabuild.weeklyreport.user.entity.User;
+import com.metabuild.weeklyreport.user.entity.RoleApprovalStatus;
 import com.metabuild.weeklyreport.user.entity.UserRole;
 
 public record CurrentUserResponse(
@@ -8,7 +9,9 @@ public record CurrentUserResponse(
         String loginId,
         String email,
         String name,
-        UserRole role
+        UserRole role,
+        UserRole requestedRole,
+        RoleApprovalStatus roleApprovalStatus
 ) {
 
     public static CurrentUserResponse from(User user) {
@@ -17,7 +20,9 @@ public record CurrentUserResponse(
                 user.getLoginId(),
                 user.getEmail(),
                 user.getName(),
-                user.getRole()
+                user.getRole(),
+                user.getRequestedRole(),
+                user.getRoleApprovalStatus()
         );
     }
 }

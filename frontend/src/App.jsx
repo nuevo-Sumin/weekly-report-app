@@ -100,8 +100,11 @@ function App() {
   const rememberedId = useMemo(() => localStorage.getItem('weekly-report-login-id') ?? '', []);
   const savedToken = useMemo(() => localStorage.getItem('weekly-report-access-token') ?? '', []);
   const savedUserName = useMemo(() => localStorage.getItem('weekly-report-user-name') ?? '', []);
+  const savedUserRole = useMemo(() => localStorage.getItem('weekly-report-user-role') ?? 'USER', []);
+  const savedRequestedRole = useMemo(() => localStorage.getItem('weekly-report-requested-role') ?? 'USER', []);
+  const savedRoleApprovalStatus = useMemo(() => localStorage.getItem('weekly-report-role-approval-status') ?? 'APPROVED', []);
   const today = useMemo(() => toDateInputValue(new Date()), []);
-  const [mode, setMode] = useState(savedToken ? 'report' : 'login');
+  const [mode, setMode] = useState(savedToken && savedUserRole === 'MANAGER' ? 'manager' : savedToken ? 'report' : 'login');
   const [token, setToken] = useState(savedToken);
   const [loginForm, setLoginForm] = useState({
     ...initialLoginForm,
@@ -111,17 +114,24 @@ function App() {
   const [signupForm, setSignupForm] = useState(initialSignupForm);
   const [findForm, setFindForm] = useState(initialFindForm);
   const [currentUserName, setCurrentUserName] = useState(savedUserName);
+  const [currentUserRole, setCurrentUserRole] = useState(savedUserRole);
+  const [requestedRole, setRequestedRole] = useState(savedRequestedRole);
+  const [roleApprovalStatus, setRoleApprovalStatus] = useState(savedRoleApprovalStatus);
   const [message, setMessage] = useState(savedToken ? '로그인 상태입니다.' : '');
   const [isLoading, setIsLoading] = useState(false);
   const [baseDate, setBaseDate] = useState(today);
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [reportForm, setReportForm] = useState(initialReportForm);
+  const [pendingSaveStatus, setPendingSaveStatus] = useState('SAVED');
 
   const isLogin = mode === 'login';
   const isSignup = mode === 'signup';
   const isFindAccount = mode === 'findAccount';
   const isReport = mode === 'report';
+  const isManager = mode === 'manager';
+  const isAuthenticated = isReport || isManager;
+  const isPendingManager = requestedRole === 'MANAGER' && roleApprovalStatus === 'PENDING';
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
 
@@ -193,11 +203,20 @@ function App() {
 
       localStorage.setItem('weekly-report-access-token', data.accessToken);
       localStorage.setItem('weekly-report-user-name', data.name);
+      localStorage.setItem('weekly-report-user-role', data.role);
+      localStorage.setItem('weekly-report-requested-role', data.requestedRole);
+      localStorage.setItem('weekly-report-role-approval-status', data.roleApprovalStatus);
       setToken(data.accessToken);
       setCurrentUserName(data.name);
+      setCurrentUserRole(data.role);
+      setRequestedRole(data.requestedRole);
+      setRoleApprovalStatus(data.roleApprovalStatus);
       setLoginForm((current) => ({ ...current, password: '' }));
-      setMode('report');
-      setMessage(`${data.name}님, 로그인되었습니다.`);
+      setMode(data.role === 'MANAGER' ? 'manager' : 'report');
+      const pendingNotice = data.requestedRole === 'MANAGER' && data.roleApprovalStatus === 'PENDING'
+        ? ' PL 권한은 승인 대기 중입니다.'
+        : '';
+      setMessage(`${data.name}님, 로그인되었습니다.${pendingNotice}`);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -234,13 +253,24 @@ function App() {
   function handleLogout() {
     localStorage.removeItem('weekly-report-access-token');
     localStorage.removeItem('weekly-report-user-name');
+    localStorage.removeItem('weekly-report-user-role');
+    localStorage.removeItem('weekly-report-requested-role');
+    localStorage.removeItem('weekly-report-role-approval-status');
     setToken('');
     setCurrentUserName('');
+    setCurrentUserRole('USER');
+    setRequestedRole('USER');
+    setRoleApprovalStatus('APPROVED');
     setItems([]);
     setSelectedIds([]);
     setReportForm(initialReportForm);
     setMode('login');
     setMessage('로그아웃되었습니다.');
+  }
+
+  function handleReportSubmit(event) {
+    event.preventDefault();
+    saveReportItem(pendingSaveStatus);
   }
 
   async function loadReportItems() {
@@ -255,7 +285,7 @@ function App() {
         auth: true,
       });
       setItems(data);
-      setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id)));
+      setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id && item.saveStatus === 'SAVED')));
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -300,6 +330,10 @@ function App() {
       setMessage('제출할 항목을 선택해 주세요.');
       return;
     }
+    if (items.some((item) => selectedIds.includes(item.id) && item.saveStatus !== 'SAVED')) {
+      setMessage('저장 상태의 항목만 제출할 수 있습니다.');
+      return;
+    }
 
     setIsLoading(true);
     setMessage('');
@@ -335,19 +369,28 @@ function App() {
   }
 
   function toggleSelected(id) {
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item || item.saveStatus !== 'SAVED') {
+      setMessage('저장 상태의 항목만 제출 대상으로 선택할 수 있습니다.');
+      return;
+    }
     setSelectedIds((current) => (
       current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
     ));
   }
 
   async function copyPreview() {
-    await navigator.clipboard.writeText(previewText);
-    setMessage('미리보기 텍스트를 복사했습니다.');
+    try {
+      await navigator.clipboard.writeText(previewText);
+      setMessage('미리보기 텍스트를 복사했습니다.');
+    } catch (error) {
+      setMessage('브라우저에서 클립보드 복사를 허용하지 않았습니다.');
+    }
   }
 
   return (
-    <main className={isReport ? 'app-shell' : 'page-shell'}>
-      <section className={isReport ? 'workspace' : 'auth-panel'} aria-labelledby="page-title">
+    <main className={isAuthenticated ? 'app-shell' : 'page-shell'}>
+      <section className={isAuthenticated ? 'workspace' : 'auth-panel'} aria-labelledby="page-title">
         <div className="topbar">
           <div className="brand-block">
             <p className="eyebrow">Metabuild PMS</p>
@@ -355,9 +398,9 @@ function App() {
             <p className="brand-copy">팀원의 주간 업무를 입력하고 단위업무별 보고 텍스트로 정리합니다.</p>
           </div>
 
-          {isReport && (
+          {isAuthenticated && (
             <div className="user-tools">
-              <span>{currentUserName || '사용자'}님</span>
+              <span>{currentUserName || '사용자'}님 · {currentUserRole === 'MANAGER' ? 'PL' : '팀원'}</span>
               <button className="secondary-button" type="button" onClick={handleLogout}>
                 로그아웃
               </button>
@@ -365,7 +408,7 @@ function App() {
           )}
         </div>
 
-        {!isReport && (
+        {!isAuthenticated && (
           <div className="auth-tabs" aria-label="인증 화면 선택">
             <button
               className={isLogin ? 'active' : ''}
@@ -526,8 +569,23 @@ function App() {
           </form>
         )}
 
+        {isManager && (
+          <div className="tool-panel manager-panel">
+            <p className="panel-label">팀장 취합 화면</p>
+            <h2>관리자 취합 기능 준비 중</h2>
+            <p>PL 승인 계정입니다. 다음 단계에서 팀원 제출 항목 조회, 단위업무별 병합, 최종 텍스트 복사 기능을 연결합니다.</p>
+          </div>
+        )}
+
         {isReport && (
           <div className="report-layout">
+            {isPendingManager && (
+              <div className="tool-panel pending-panel">
+                <p className="panel-label">PL 권한 승인 대기</p>
+                <p>현재는 팀원 권한으로 이용할 수 있습니다. 관리자 승인 후 팀장 취합 화면이 열립니다.</p>
+              </div>
+            )}
+
             <section className="tool-panel">
               <div className="section-header">
                 <div>
@@ -554,7 +612,7 @@ function App() {
                 </div>
               </div>
 
-              <form className="report-form" onSubmit={(event) => event.preventDefault()}>
+              <form className="report-form" onSubmit={handleReportSubmit}>
                 <label>
                   주차 구분
                   <select
@@ -641,10 +699,10 @@ function App() {
                 </label>
 
                 <div className="button-row wide-field">
-                  <button className="secondary-button" type="button" onClick={() => saveReportItem('DRAFT')} disabled={isLoading}>
+                  <button className="secondary-button" type="submit" onClick={() => setPendingSaveStatus('DRAFT')} disabled={isLoading}>
                     임시저장
                   </button>
-                  <button className="primary-button compact" type="button" onClick={() => saveReportItem('SAVED')} disabled={isLoading}>
+                  <button className="primary-button compact" type="submit" onClick={() => setPendingSaveStatus('SAVED')} disabled={isLoading}>
                     {reportForm.id ? '수정 저장' : '저장'}
                   </button>
                 </div>
@@ -680,6 +738,7 @@ function App() {
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(item.id)}
+                        disabled={item.saveStatus !== 'SAVED'}
                         onChange={() => toggleSelected(item.id)}
                       />
                       <span className="sr-only">선택</span>

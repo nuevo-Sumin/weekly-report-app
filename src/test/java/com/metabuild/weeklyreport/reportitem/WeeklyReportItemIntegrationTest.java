@@ -93,6 +93,55 @@ class WeeklyReportItemIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
+    @Test
+    void submittedItemsCannotBeEditedOrSubmittedAgain() throws Exception {
+        String token = signupAndLogin("submittedguard");
+        Long itemId = createItem(token, "제출 보호", SaveStatus.SAVED);
+
+        ReportItemSubmitRequest submitRequest = new ReportItemSubmitRequest(List.of(itemId));
+        mockMvc.perform(post("/api/report-items/submit")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(submitRequest)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/report-items/{itemId}", itemId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reportItemRequest("제출 보호", SaveStatus.SAVED))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+
+        mockMvc.perform(post("/api/report-items/submit")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(submitRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void userCannotUpdateOrSubmitAnotherUsersItem() throws Exception {
+        String ownerToken = signupAndLogin("owneruser");
+        String attackerToken = signupAndLogin("attackeruser");
+        Long itemId = createItem(ownerToken, "소유자 항목", SaveStatus.SAVED);
+
+        mockMvc.perform(put("/api/report-items/{itemId}", itemId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + attackerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reportItemRequest("공격자 수정", SaveStatus.SAVED))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+
+        ReportItemSubmitRequest submitRequest = new ReportItemSubmitRequest(List.of(itemId));
+        mockMvc.perform(post("/api/report-items/submit")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + attackerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(submitRequest)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
     private Long createItem(String token, String unitTask, SaveStatus saveStatus) throws Exception {
         ReportItemRequest request = reportItemRequest(unitTask, saveStatus);
         MvcResult result = mockMvc.perform(post("/api/report-items")

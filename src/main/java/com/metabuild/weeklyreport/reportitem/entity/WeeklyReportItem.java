@@ -140,6 +140,9 @@ public class WeeklyReportItem {
     }
 
     public void submit(LocalDateTime submittedAt) {
+        if (this.saveStatus == SaveStatus.SUBMITTED) {
+            return;
+        }
         this.saveStatus = SaveStatus.SUBMITTED;
         this.submittedAt = submittedAt;
     }

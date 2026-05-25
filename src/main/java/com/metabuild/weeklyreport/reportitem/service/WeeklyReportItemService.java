@@ -86,6 +86,9 @@ public class WeeklyReportItemService {
     @Transactional
     public ReportItemResponse update(String loginId, Long itemId, ReportItemRequest request) {
         WeeklyReportItem item = getOwnedItem(loginId, itemId);
+        if (item.getSaveStatus() == SaveStatus.SUBMITTED) {
+            throw new IllegalArgumentException("Submitted report items cannot be edited.");
+        }
         item.update(
                 request.reportStartDate(),
                 request.reportEndDate(),
@@ -107,10 +110,16 @@ public class WeeklyReportItemService {
     public List<ReportItemResponse> submit(String loginId, ReportItemSubmitRequest request) {
         User author = getUser(loginId);
         Set<Long> requestedIds = new HashSet<>(request.itemIds());
+        if (requestedIds.size() != request.itemIds().size()) {
+            throw new IllegalArgumentException("Duplicate report item ids are not allowed.");
+        }
         List<WeeklyReportItem> items = reportItemRepository.findByAuthorAndIdIn(author, requestedIds);
 
         if (items.size() != requestedIds.size()) {
             throw new AccessDeniedException("Only your own report items can be submitted.");
+        }
+        if (items.stream().anyMatch(item -> item.getSaveStatus() != SaveStatus.SAVED)) {
+            throw new IllegalArgumentException("Only saved report items can be submitted.");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -120,12 +129,8 @@ public class WeeklyReportItemService {
 
     private WeeklyReportItem getOwnedItem(String loginId, Long itemId) {
         User author = getUser(loginId);
-        WeeklyReportItem item = reportItemRepository.findById(itemId)
+        return reportItemRepository.findByAuthorAndId(author, itemId)
                 .orElseThrow(() -> new EntityNotFoundException("Report item not found."));
-        if (!item.getAuthor().getId().equals(author.getId())) {
-            throw new AccessDeniedException("Only your own report items can be modified.");
-        }
-        return item;
     }
 
     private User getUser(String loginId) {

@@ -318,6 +318,17 @@ textarea:focus {
   grid-column: 1 / -1;
 }
 
+.pending-panel,
+.manager-panel {
+  grid-column: 1 / -1;
+}
+
+.pending-panel p,
+.manager-panel p {
+  margin: 8px 0 0;
+  color: #4d6655;
+}
+
 .period-grid {
   display: grid;
   grid-template-columns: minmax(180px, 260px) 1fr;

@@ -12,7 +12,7 @@ spring:
     open-in-view: false
   h2:
     console:
-      enabled: true
+      enabled: false
 
 jwt:
   secret: ${JWT_SECRET:}

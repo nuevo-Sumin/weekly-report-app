@@ -98,6 +98,25 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.data.role").value("USER"))
                 .andExpect(jsonPath("$.data.requestedRole").value("MANAGER"))
                 .andExpect(jsonPath("$.data.roleApprovalStatus").value("PENDING"));
+
+        LoginRequest loginRequest = new LoginRequest("managerrequest", "password123");
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("USER"))
+                .andExpect(jsonPath("$.data.requestedRole").value("MANAGER"))
+                .andExpect(jsonPath("$.data.roleApprovalStatus").value("PENDING"))
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(loginResult.getResponse().getContentAsString());
+        String token = response.path("data").path("accessToken").asText();
+        mockMvc.perform(get("/api/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("USER"))
+                .andExpect(jsonPath("$.data.requestedRole").value("MANAGER"))
+                .andExpect(jsonPath("$.data.roleApprovalStatus").value("PENDING"));
     }
 
     private String signupAndLogin(String loginId) throws Exception {

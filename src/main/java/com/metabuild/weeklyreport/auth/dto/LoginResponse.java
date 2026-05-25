@@ -1,6 +1,7 @@
 package com.metabuild.weeklyreport.auth.dto;
 
 import com.metabuild.weeklyreport.user.entity.User;
+import com.metabuild.weeklyreport.user.entity.RoleApprovalStatus;
 import com.metabuild.weeklyreport.user.entity.UserRole;
 
 public record LoginResponse(
@@ -10,7 +11,9 @@ public record LoginResponse(
         String loginId,
         String email,
         String name,
-        UserRole role
+        UserRole role,
+        UserRole requestedRole,
+        RoleApprovalStatus roleApprovalStatus
 ) {
 
     public static LoginResponse bearer(String accessToken, User user) {
@@ -21,7 +24,9 @@ public record LoginResponse(
                 user.getLoginId(),
                 user.getEmail(),
                 user.getName(),
-                user.getRole()
+                user.getRole(),
+                user.getRequestedRole(),
+                user.getRoleApprovalStatus()
         );
     }
 }
