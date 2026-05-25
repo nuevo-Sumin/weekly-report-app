@@ -22,7 +22,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/signup", "/h2-console/**").permitAll()
+                        .requestMatchers("/api/auth/signup", "/api/auth/login", "/h2-console/**").permitAll()
                         .anyRequest().denyAll()
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))

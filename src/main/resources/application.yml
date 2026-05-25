@@ -13,3 +13,7 @@ spring:
   h2:
     console:
       enabled: true
+
+jwt:
+  secret: ${JWT_SECRET:}
+  expiration: ${JWT_EXPIRATION:3600000}
