@@ -1,8 +1,4 @@
+frontend/node_modules/
+frontend/dist/
 target/
-.mvn/*
-!.mvn/wrapper/
-!.mvn/wrapper/**
-*.log
 .idea/
-.vscode/
-*.iml
