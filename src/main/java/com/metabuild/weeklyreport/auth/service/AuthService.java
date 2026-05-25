@@ -1,5 +1,6 @@
 package com.metabuild.weeklyreport.auth.service;
 
+import com.metabuild.weeklyreport.auth.dto.CurrentUserResponse;
 import com.metabuild.weeklyreport.auth.dto.LoginRequest;
 import com.metabuild.weeklyreport.auth.dto.LoginResponse;
 import com.metabuild.weeklyreport.auth.dto.SignupRequest;
@@ -8,6 +9,7 @@ import com.metabuild.weeklyreport.security.JwtTokenProvider;
 import com.metabuild.weeklyreport.user.entity.User;
 import com.metabuild.weeklyreport.user.entity.UserRole;
 import com.metabuild.weeklyreport.user.repository.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
 import java.util.Locale;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -68,10 +70,18 @@ public class AuthService {
 
         User user = userRepository.findByLoginId(loginId)
                 .filter(found -> passwordEncoder.matches(request.password(), found.getPasswordHash()))
+                .filter(User::isActive)
                 .orElseThrow(() -> new BadCredentialsException("Invalid login id or password."));
 
         String accessToken = jwtTokenProvider.createAccessToken(user);
         return LoginResponse.bearer(accessToken, user);
+    }
+
+    @Transactional(readOnly = true)
+    public CurrentUserResponse getCurrentUser(String loginId) {
+        User user = userRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found."));
+        return CurrentUserResponse.from(user);
     }
 
     private String normalizeLoginId(String loginId) {
