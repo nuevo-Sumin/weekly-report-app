@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const initialLoginForm = {
   loginId: '',
@@ -11,17 +11,98 @@ const initialSignupForm = {
   password: '',
   email: '',
   name: '',
+  requestedRole: 'USER',
 };
 
 const initialFindForm = {
   email: '',
 };
 
+const initialReportForm = {
+  id: null,
+  weekType: 'THIS_WEEK',
+  unitTask: '',
+  title: '',
+  detailContent: '',
+  progressContent: '',
+  status: 'IN_PROGRESS',
+  progressRate: 0,
+  dueDate: '',
+  completed: false,
+};
+
+const statusLabels = {
+  NEW: '신규',
+  IN_PROGRESS: '진행중',
+  DONE: '완료',
+  HOLD: '보류',
+};
+
+const weekTypeLabels = {
+  THIS_WEEK: '금주',
+  NEXT_WEEK: '차주',
+};
+
+function toDateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getWeekRange(dateValue) {
+  const date = dateValue ? new Date(`${dateValue}T00:00:00`) : new Date();
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  return {
+    startDate: toDateInputValue(monday),
+    endDate: toDateInputValue(sunday),
+  };
+}
+
+function formatDate(dateValue) {
+  return dateValue.replaceAll('-', '.');
+}
+
+function buildPreview(items, selectedIds) {
+  const selectedItems = items.filter((item) => selectedIds.includes(item.id));
+
+  if (selectedItems.length === 0) {
+    return '선택된 항목이 없습니다.';
+  }
+
+  const [firstItem] = selectedItems;
+  const sections = ['THIS_WEEK', 'NEXT_WEEK'].map((weekType) => {
+    const weeklyItems = selectedItems.filter((item) => item.weekType === weekType);
+    const grouped = weeklyItems.reduce((acc, item) => {
+      acc[item.unitTask] = [...(acc[item.unitTask] ?? []), item];
+      return acc;
+    }, {});
+
+    const lines = Object.entries(grouped).flatMap(([unitTask, groupItems]) => [
+      `[${unitTask}]`,
+      ...groupItems.map((item) => `- ${item.title}: ${item.progressContent}`),
+    ]);
+
+    return [`### ${weekTypeLabels[weekType]}`, ...(lines.length ? lines : ['선택된 항목 없음'])].join('\n');
+  });
+
+  return [
+    `## 주간업무보고 (${formatDate(firstItem.reportStartDate)} ~ ${formatDate(firstItem.reportEndDate)})`,
+    '',
+    ...sections,
+  ].join('\n\n');
+}
+
 function App() {
   const rememberedId = useMemo(() => localStorage.getItem('weekly-report-login-id') ?? '', []);
   const savedToken = useMemo(() => localStorage.getItem('weekly-report-access-token') ?? '', []);
   const savedUserName = useMemo(() => localStorage.getItem('weekly-report-user-name') ?? '', []);
-  const [mode, setMode] = useState(savedToken ? 'signedIn' : 'login');
+  const today = useMemo(() => toDateInputValue(new Date()), []);
+  const [mode, setMode] = useState(savedToken ? 'report' : 'login');
+  const [token, setToken] = useState(savedToken);
   const [loginForm, setLoginForm] = useState({
     ...initialLoginForm,
     loginId: rememberedId,
@@ -32,11 +113,23 @@ function App() {
   const [currentUserName, setCurrentUserName] = useState(savedUserName);
   const [message, setMessage] = useState(savedToken ? '로그인 상태입니다.' : '');
   const [isLoading, setIsLoading] = useState(false);
+  const [baseDate, setBaseDate] = useState(today);
+  const [items, setItems] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [reportForm, setReportForm] = useState(initialReportForm);
 
   const isLogin = mode === 'login';
   const isSignup = mode === 'signup';
   const isFindAccount = mode === 'findAccount';
-  const isSignedIn = mode === 'signedIn';
+  const isReport = mode === 'report';
+  const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
+  const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
+
+  useEffect(() => {
+    if (isReport && token) {
+      loadReportItems();
+    }
+  }, [isReport, token, weekRange.startDate, weekRange.endDate]);
 
   function updateLoginForm(field, value) {
     setLoginForm((current) => ({ ...current, [field]: value }));
@@ -50,16 +143,25 @@ function App() {
     setFindForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateReportForm(field, value) {
+    setReportForm((current) => ({ ...current, [field]: value }));
+  }
+
   function openMode(nextMode) {
     setMode(nextMode);
     setMessage('');
   }
 
-  async function requestApi(path, body) {
+  async function requestApi(path, { method = 'POST', body, auth = false } = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (auth && token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     const response = await fetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
     });
     const payload = await response.json();
 
@@ -77,8 +179,10 @@ function App() {
 
     try {
       const data = await requestApi('/api/auth/login', {
-        loginId: loginForm.loginId,
-        password: loginForm.password,
+        body: {
+          loginId: loginForm.loginId,
+          password: loginForm.password,
+        },
       });
 
       if (loginForm.rememberId) {
@@ -89,9 +193,10 @@ function App() {
 
       localStorage.setItem('weekly-report-access-token', data.accessToken);
       localStorage.setItem('weekly-report-user-name', data.name);
+      setToken(data.accessToken);
       setCurrentUserName(data.name);
       setLoginForm((current) => ({ ...current, password: '' }));
-      setMode('signedIn');
+      setMode('report');
       setMessage(`${data.name}님, 로그인되었습니다.`);
     } catch (error) {
       setMessage(error.message);
@@ -106,8 +211,11 @@ function App() {
     setMessage('');
 
     try {
-      await requestApi('/api/auth/signup', signupForm);
-      setMessage('회원가입이 완료되었습니다. 로그인해 주세요.');
+      const data = await requestApi('/api/auth/signup', { body: signupForm });
+      const managerNotice = data.roleApprovalStatus === 'PENDING'
+        ? ' PL 권한은 관리자 승인 후 적용됩니다.'
+        : '';
+      setMessage(`회원가입이 완료되었습니다.${managerNotice} 로그인해 주세요.`);
       setLoginForm((current) => ({ ...current, loginId: signupForm.loginId, password: '' }));
       setSignupForm(initialSignupForm);
       setMode('login');
@@ -126,21 +234,138 @@ function App() {
   function handleLogout() {
     localStorage.removeItem('weekly-report-access-token');
     localStorage.removeItem('weekly-report-user-name');
+    setToken('');
     setCurrentUserName('');
+    setItems([]);
+    setSelectedIds([]);
+    setReportForm(initialReportForm);
     setMode('login');
     setMessage('로그아웃되었습니다.');
   }
 
+  async function loadReportItems() {
+    setIsLoading(true);
+    try {
+      const query = new URLSearchParams({
+        reportStartDate: weekRange.startDate,
+        reportEndDate: weekRange.endDate,
+      });
+      const data = await requestApi(`/api/report-items?${query.toString()}`, {
+        method: 'GET',
+        auth: true,
+      });
+      setItems(data);
+      setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id)));
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function saveReportItem(saveStatus) {
+    setIsLoading(true);
+    setMessage('');
+
+    try {
+      const body = {
+        reportStartDate: weekRange.startDate,
+        reportEndDate: weekRange.endDate,
+        weekType: reportForm.weekType,
+        unitTask: reportForm.unitTask,
+        title: reportForm.title,
+        detailContent: reportForm.detailContent,
+        progressContent: reportForm.progressContent,
+        status: reportForm.completed ? 'DONE' : reportForm.status,
+        progressRate: Number(reportForm.progressRate),
+        dueDate: reportForm.dueDate || null,
+        completed: reportForm.completed,
+        saveStatus,
+      };
+      const path = reportForm.id ? `/api/report-items/${reportForm.id}` : '/api/report-items';
+      const method = reportForm.id ? 'PUT' : 'POST';
+      await requestApi(path, { method, body, auth: true });
+      setReportForm(initialReportForm);
+      setMessage(saveStatus === 'DRAFT' ? '임시저장되었습니다.' : '저장되었습니다.');
+      await loadReportItems();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function submitSelectedItems() {
+    if (selectedIds.length === 0) {
+      setMessage('제출할 항목을 선택해 주세요.');
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage('');
+
+    try {
+      await requestApi('/api/report-items/submit', {
+        body: { itemIds: selectedIds },
+        auth: true,
+      });
+      setMessage('선택한 항목을 제출했습니다.');
+      await loadReportItems();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function editReportItem(item) {
+    setReportForm({
+      id: item.id,
+      weekType: item.weekType,
+      unitTask: item.unitTask,
+      title: item.title,
+      detailContent: item.detailContent,
+      progressContent: item.progressContent,
+      status: item.status,
+      progressRate: item.progressRate,
+      dueDate: item.dueDate ?? '',
+      completed: item.completed,
+    });
+    setMessage('선택한 항목을 수정 모드로 불러왔습니다.');
+  }
+
+  function toggleSelected(id) {
+    setSelectedIds((current) => (
+      current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
+    ));
+  }
+
+  async function copyPreview() {
+    await navigator.clipboard.writeText(previewText);
+    setMessage('미리보기 텍스트를 복사했습니다.');
+  }
+
   return (
-    <main className="page-shell">
-      <section className="auth-panel" aria-labelledby="auth-title">
-        <div className="brand-block">
-          <p className="eyebrow">Metabuild PMS</p>
-          <h1 id="auth-title">주간업무보고</h1>
-          <p className="brand-copy">팀원의 주간 업무를 입력하고 단위업무별 보고 텍스트로 정리합니다.</p>
+    <main className={isReport ? 'app-shell' : 'page-shell'}>
+      <section className={isReport ? 'workspace' : 'auth-panel'} aria-labelledby="page-title">
+        <div className="topbar">
+          <div className="brand-block">
+            <p className="eyebrow">Metabuild PMS</p>
+            <h1 id="page-title">주간업무보고</h1>
+            <p className="brand-copy">팀원의 주간 업무를 입력하고 단위업무별 보고 텍스트로 정리합니다.</p>
+          </div>
+
+          {isReport && (
+            <div className="user-tools">
+              <span>{currentUserName || '사용자'}님</span>
+              <button className="secondary-button" type="button" onClick={handleLogout}>
+                로그아웃
+              </button>
+            </div>
+          )}
         </div>
 
-        {!isSignedIn && (
+        {!isReport && (
           <div className="auth-tabs" aria-label="인증 화면 선택">
             <button
               className={isLogin ? 'active' : ''}
@@ -157,18 +382,6 @@ function App() {
               onClick={() => openMode('signup')}
             >
               회원가입
-            </button>
-          </div>
-        )}
-
-        {isSignedIn && (
-          <div className="signed-in-panel">
-            <div>
-              <p className="panel-label">로그인 사용자</p>
-              <strong>{currentUserName || '사용자'}님</strong>
-            </div>
-            <button className="secondary-button" type="button" onClick={handleLogout}>
-              로그아웃
             </button>
           </div>
         )}
@@ -266,6 +479,17 @@ function App() {
               />
             </label>
 
+            <label>
+              직급
+              <select
+                value={signupForm.requestedRole}
+                onChange={(event) => updateSignupForm('requestedRole', event.target.value)}
+              >
+                <option value="USER">개발자(팀원)</option>
+                <option value="MANAGER">PL(팀장) 승인 요청</option>
+              </select>
+            </label>
+
             <button className="primary-button" disabled={isLoading} type="submit">
               {isLoading ? '가입 중' : '회원가입'}
             </button>
@@ -300,6 +524,192 @@ function App() {
               </button>
             </div>
           </form>
+        )}
+
+        {isReport && (
+          <div className="report-layout">
+            <section className="tool-panel">
+              <div className="section-header">
+                <div>
+                  <p className="panel-label">팀원 제출 화면</p>
+                  <h2>업무 항목 입력</h2>
+                </div>
+                <button className="secondary-button" type="button" onClick={loadReportItems}>
+                  새로고침
+                </button>
+              </div>
+
+              <div className="period-grid">
+                <label>
+                  기준 일자
+                  <input
+                    type="date"
+                    value={baseDate}
+                    onChange={(event) => setBaseDate(event.target.value)}
+                  />
+                </label>
+                <div className="readonly-box">
+                  <span>보고 기간</span>
+                  <strong>{formatDate(weekRange.startDate)} ~ {formatDate(weekRange.endDate)}</strong>
+                </div>
+              </div>
+
+              <form className="report-form" onSubmit={(event) => event.preventDefault()}>
+                <label>
+                  주차 구분
+                  <select
+                    value={reportForm.weekType}
+                    onChange={(event) => updateReportForm('weekType', event.target.value)}
+                  >
+                    <option value="THIS_WEEK">금주</option>
+                    <option value="NEXT_WEEK">차주</option>
+                  </select>
+                </label>
+                <label>
+                  단위업무
+                  <input
+                    value={reportForm.unitTask}
+                    onChange={(event) => updateReportForm('unitTask', event.target.value)}
+                    placeholder="예: 주간보고"
+                    required
+                  />
+                </label>
+                <label>
+                  세부사항
+                  <input
+                    value={reportForm.title}
+                    onChange={(event) => updateReportForm('title', event.target.value)}
+                    placeholder="업무 제목"
+                    required
+                  />
+                </label>
+                <label className="wide-field">
+                  업무 상세
+                  <textarea
+                    value={reportForm.detailContent}
+                    onChange={(event) => updateReportForm('detailContent', event.target.value)}
+                    placeholder="업무 상세 내용을 입력하세요."
+                    required
+                  />
+                </label>
+                <label className="wide-field">
+                  진행내용
+                  <textarea
+                    value={reportForm.progressContent}
+                    onChange={(event) => updateReportForm('progressContent', event.target.value)}
+                    placeholder="금주 진행 또는 차주 예정 내용을 입력하세요."
+                    required
+                  />
+                </label>
+                <label>
+                  상태
+                  <select
+                    value={reportForm.status}
+                    onChange={(event) => updateReportForm('status', event.target.value)}
+                  >
+                    <option value="NEW">신규</option>
+                    <option value="IN_PROGRESS">진행중</option>
+                    <option value="DONE">완료</option>
+                    <option value="HOLD">보류</option>
+                  </select>
+                </label>
+                <label>
+                  진행률
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={reportForm.progressRate}
+                    onChange={(event) => updateReportForm('progressRate', event.target.value)}
+                  />
+                </label>
+                <label>
+                  완료기한
+                  <input
+                    type="date"
+                    value={reportForm.dueDate}
+                    onChange={(event) => updateReportForm('dueDate', event.target.value)}
+                  />
+                </label>
+                <label className="check-label align-end">
+                  <input
+                    type="checkbox"
+                    checked={reportForm.completed}
+                    onChange={(event) => updateReportForm('completed', event.target.checked)}
+                  />
+                  완료여부
+                </label>
+
+                <div className="button-row wide-field">
+                  <button className="secondary-button" type="button" onClick={() => saveReportItem('DRAFT')} disabled={isLoading}>
+                    임시저장
+                  </button>
+                  <button className="primary-button compact" type="button" onClick={() => saveReportItem('SAVED')} disabled={isLoading}>
+                    {reportForm.id ? '수정 저장' : '저장'}
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section className="tool-panel">
+              <div className="section-header">
+                <div>
+                  <p className="panel-label">저장된 항목</p>
+                  <h2>제출 항목 선택</h2>
+                </div>
+                <button className="primary-button compact" type="button" onClick={submitSelectedItems} disabled={isLoading}>
+                  제출
+                </button>
+              </div>
+
+              <div className="items-table" role="table" aria-label="주간업무 항목 목록">
+                <div className="items-row header" role="row">
+                  <span>선택</span>
+                  <span>구분</span>
+                  <span>단위업무</span>
+                  <span>세부사항</span>
+                  <span>상태</span>
+                  <span>저장</span>
+                  <span>수정</span>
+                </div>
+                {items.length === 0 ? (
+                  <p className="empty-state">아직 저장된 항목이 없습니다.</p>
+                ) : items.map((item) => (
+                  <div className="items-row" role="row" key={item.id}>
+                    <label className="check-label table-check">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() => toggleSelected(item.id)}
+                      />
+                      <span className="sr-only">선택</span>
+                    </label>
+                    <span>{weekTypeLabels[item.weekType]}</span>
+                    <span>{item.unitTask}</span>
+                    <span>{item.title}</span>
+                    <span>{statusLabels[item.status]}</span>
+                    <span>{item.saveStatus}</span>
+                    <button className="link-button" type="button" onClick={() => editReportItem(item)}>
+                      수정
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="tool-panel preview-panel">
+              <div className="section-header">
+                <div>
+                  <p className="panel-label">미리보기</p>
+                  <h2>단위업무별 병합 결과</h2>
+                </div>
+                <button className="secondary-button" type="button" onClick={copyPreview}>
+                  복사
+                </button>
+              </div>
+              <pre>{previewText}</pre>
+            </section>
+          </div>
         )}
 
         {message && (

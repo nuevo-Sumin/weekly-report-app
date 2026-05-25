@@ -1,4 +1,5 @@
 {
+  "name": "metabuild-weekly-report-frontend",
   "private": true,
   "type": "module",
   "scripts": {
