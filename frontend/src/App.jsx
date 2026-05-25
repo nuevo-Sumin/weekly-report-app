@@ -10,6 +10,7 @@ import {
 } from './sessionStorage';
 import AppHeader from './components/AppHeader';
 import AuthPanel from './components/AuthPanel';
+import ManagerReportScreen from './components/ManagerReportScreen';
 import MemberReportScreen from './components/MemberReportScreen';
 
 function getInitialMode(session) {
@@ -208,11 +209,12 @@ function App() {
         )}
 
         {mode === 'manager' && (
-          <div className="tool-panel manager-panel">
-            <p className="panel-label">팀장 취합 화면</p>
-            <h2>관리자 취합 기능 준비 중</h2>
-            <p>PL 승인 계정입니다. 다음 단계에서 팀원 제출 항목 조회, 단위업무별 병합, 최종 텍스트 복사 기능을 연결합니다.</p>
-          </div>
+          <ManagerReportScreen
+            token={token}
+            isLoading={isLoading}
+            setIsLoading={setIsLoading}
+            setMessage={setMessage}
+          />
         )}
 
         {mode === 'report' && (
