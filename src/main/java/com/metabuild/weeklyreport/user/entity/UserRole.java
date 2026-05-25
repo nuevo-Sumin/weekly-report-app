@@ -1,6 +1,6 @@
 package com.metabuild.weeklyreport.user.entity;
 
 public enum UserRole {
-    MEMBER,
-    ADMIN
+    USER,
+    MANAGER
 }

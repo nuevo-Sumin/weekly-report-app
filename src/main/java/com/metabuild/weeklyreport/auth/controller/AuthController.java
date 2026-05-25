@@ -1,9 +1,7 @@
 package com.metabuild.weeklyreport.auth.controller;
 
-import com.metabuild.weeklyreport.auth.dto.AuthResponse;
-import com.metabuild.weeklyreport.auth.dto.LoginRequest;
 import com.metabuild.weeklyreport.auth.dto.SignupRequest;
-import com.metabuild.weeklyreport.auth.dto.UserResponse;
+import com.metabuild.weeklyreport.auth.dto.SignupResponse;
 import com.metabuild.weeklyreport.auth.service.AuthService;
 import com.metabuild.weeklyreport.common.ApiResponse;
 import jakarta.validation.Valid;
@@ -23,17 +21,7 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public ApiResponse<UserResponse> signup(@Valid @RequestBody SignupRequest request) {
+    public ApiResponse<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
         return ApiResponse.success(authService.signup(request), "Signup completed.");
-    }
-
-    @PostMapping("/login")
-    public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.success(authService.login(request), "Login completed.");
-    }
-
-    @PostMapping("/logout")
-    public ApiResponse<Void> logout() {
-        return ApiResponse.success(null, "Logout completed.");
     }
 }

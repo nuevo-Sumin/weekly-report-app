@@ -3,7 +3,7 @@ package com.metabuild.weeklyreport.auth.dto;
 import com.metabuild.weeklyreport.user.entity.User;
 import com.metabuild.weeklyreport.user.entity.UserRole;
 
-public record UserResponse(
+public record SignupResponse(
         Long id,
         String loginId,
         String email,
@@ -11,8 +11,8 @@ public record UserResponse(
         UserRole role
 ) {
 
-    public static UserResponse from(User user) {
-        return new UserResponse(
+    public static SignupResponse from(User user) {
+        return new SignupResponse(
                 user.getId(),
                 user.getLoginId(),
                 user.getEmail(),

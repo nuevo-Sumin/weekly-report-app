@@ -3,11 +3,13 @@
 ## Active Branch
 
 - Work on `dev`.
+- ask for a permission to commit on the branch
 
 ## Skills Applied
 
 - `spring-api-feature`
 - `jwt-auth`
+- `code-review`
 
 ## First Milestone
 
