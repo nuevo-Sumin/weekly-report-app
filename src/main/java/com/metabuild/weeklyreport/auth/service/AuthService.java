@@ -6,6 +6,7 @@ import com.metabuild.weeklyreport.auth.dto.LoginResponse;
 import com.metabuild.weeklyreport.auth.dto.SignupRequest;
 import com.metabuild.weeklyreport.auth.dto.SignupResponse;
 import com.metabuild.weeklyreport.security.JwtTokenProvider;
+import com.metabuild.weeklyreport.user.entity.RoleApprovalStatus;
 import com.metabuild.weeklyreport.user.entity.User;
 import com.metabuild.weeklyreport.user.entity.UserRole;
 import com.metabuild.weeklyreport.user.repository.UserRepository;
@@ -46,12 +47,20 @@ public class AuthService {
             throw new IllegalArgumentException("Email already exists.");
         }
 
+        UserRole requestedRole = request.requestedRole() == null ? UserRole.USER : request.requestedRole();
+        UserRole grantedRole = requestedRole == UserRole.MANAGER ? UserRole.USER : requestedRole;
+        RoleApprovalStatus roleApprovalStatus = requestedRole == UserRole.MANAGER
+                ? RoleApprovalStatus.PENDING
+                : RoleApprovalStatus.APPROVED;
+
         User user = new User(
                 loginId,
                 email,
                 passwordEncoder.encode(request.password()),
                 name,
-                UserRole.USER
+                grantedRole,
+                requestedRole,
+                roleApprovalStatus
         );
 
         User savedUser = userRepository.save(user);
@@ -60,7 +69,9 @@ public class AuthService {
                 savedUser.getLoginId(),
                 savedUser.getEmail(),
                 savedUser.getName(),
-                savedUser.getRole()
+                savedUser.getRole(),
+                savedUser.getRequestedRole(),
+                savedUser.getRoleApprovalStatus()
         );
     }
 

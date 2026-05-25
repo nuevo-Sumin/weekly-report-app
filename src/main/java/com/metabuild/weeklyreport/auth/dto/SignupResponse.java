@@ -1,5 +1,6 @@
 package com.metabuild.weeklyreport.auth.dto;
 
+import com.metabuild.weeklyreport.user.entity.RoleApprovalStatus;
 import com.metabuild.weeklyreport.user.entity.UserRole;
 
 public record SignupResponse(
@@ -7,6 +8,8 @@ public record SignupResponse(
         String loginId,
         String email,
         String name,
-        UserRole role
+        UserRole role,
+        UserRole requestedRole,
+        RoleApprovalStatus roleApprovalStatus
 ) {
 }

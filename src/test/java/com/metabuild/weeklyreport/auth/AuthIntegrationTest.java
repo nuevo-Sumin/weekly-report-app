@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metabuild.weeklyreport.auth.dto.LoginRequest;
 import com.metabuild.weeklyreport.auth.dto.SignupRequest;
+import com.metabuild.weeklyreport.user.entity.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -77,6 +78,26 @@ class AuthIntegrationTest {
                         .content(objectMapper.writeValueAsString(signupRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void managerSignupRequiresApprovalBeforeRoleIsGranted() throws Exception {
+        SignupRequest signupRequest = new SignupRequest(
+                "managerrequest",
+                "password123",
+                "managerrequest@example.com",
+                "Manager Request",
+                UserRole.MANAGER
+        );
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signupRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.role").value("USER"))
+                .andExpect(jsonPath("$.data.requestedRole").value("MANAGER"))
+                .andExpect(jsonPath("$.data.roleApprovalStatus").value("PENDING"));
     }
 
     private String signupAndLogin(String loginId) throws Exception {

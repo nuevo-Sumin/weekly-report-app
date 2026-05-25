@@ -1,5 +1,6 @@
 package com.metabuild.weeklyreport.auth.dto;
 
+import com.metabuild.weeklyreport.user.entity.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -23,6 +24,12 @@ public record SignupRequest(
 
         @NotBlank
         @Size(max = 80)
-        String name
+        String name,
+
+        UserRole requestedRole
 ) {
+
+    public SignupRequest(String loginId, String password, String email, String name) {
+        this(loginId, password, email, name, UserRole.USER);
+    }
 }

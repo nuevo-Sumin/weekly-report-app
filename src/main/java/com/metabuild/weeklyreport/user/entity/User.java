@@ -36,6 +36,14 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserRole role;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole requestedRole;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RoleApprovalStatus roleApprovalStatus;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -48,12 +56,22 @@ public class User {
     protected User() {
     }
 
-    public User(String loginId, String email, String passwordHash, String name, UserRole role) {
+    public User(
+            String loginId,
+            String email,
+            String passwordHash,
+            String name,
+            UserRole role,
+            UserRole requestedRole,
+            RoleApprovalStatus roleApprovalStatus
+    ) {
         this.loginId = loginId;
         this.email = email;
         this.passwordHash = passwordHash;
         this.name = name;
         this.role = role;
+        this.requestedRole = requestedRole;
+        this.roleApprovalStatus = roleApprovalStatus;
         this.active = true;
     }
 
@@ -91,6 +109,14 @@ public class User {
 
     public UserRole getRole() {
         return role;
+    }
+
+    public UserRole getRequestedRole() {
+        return requestedRole;
+    }
+
+    public RoleApprovalStatus getRoleApprovalStatus() {
+        return roleApprovalStatus;
     }
 
     public boolean isActive() {
