@@ -42,3 +42,9 @@ export const weekTypeLabels = {
   THIS_WEEK: '금주',
   NEXT_WEEK: '차주',
 };
+
+export const csvWeekSelectionLabels = {
+  THIS_WEEK: '금주',
+  NEXT_WEEK: '차주',
+  ALL: '모두',
+};

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { initialReportForm, statusLabels, weekTypeLabels } from '../constants';
+import { csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels } from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
 import { buildPreview } from '../reportPreview';
 import { requestApi } from '../api';
+import { parseReportCsvBuffer } from '../csvReportImport';
 
 function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }) {
   const today = useMemo(() => toDateInputValue(new Date()), []);
@@ -11,6 +12,8 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [selectedIds, setSelectedIds] = useState([]);
   const [reportForm, setReportForm] = useState(initialReportForm);
   const [mergedReportId, setMergedReportId] = useState(null);
+  const [csvRows, setCsvRows] = useState([]);
+  const [csvFileName, setCsvFileName] = useState('');
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
@@ -24,6 +27,92 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
 
   function updateReportForm(field, value) {
     setReportForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateCsvRow(tempId, field, value) {
+    setCsvRows((current) => current.map((row) => (
+      row.tempId === tempId ? { ...row, [field]: value } : row
+    )));
+  }
+
+  function handleCsvFileChange(event) {
+    const [file] = event.target.files;
+    if (!file) {
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setMessage('CSV 파일만 업로드할 수 있습니다.');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const rows = parseReportCsvBuffer(reader.result);
+        setCsvRows(rows);
+        setCsvFileName(file.name);
+        setMessage(`${rows.length}개 CSV 행을 불러왔습니다. 행별 주차 구분을 확인해 주세요.`);
+      } catch (error) {
+        setCsvRows([]);
+        setCsvFileName('');
+        setMessage(error.message);
+      } finally {
+        event.target.value = '';
+      }
+    };
+    reader.onerror = () => {
+      setMessage('CSV 파일을 읽지 못했습니다.');
+      event.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  async function saveCsvRows() {
+    const rowsToSave = csvRows.filter((row) => row.selected);
+    if (rowsToSave.length === 0) {
+      setMessage('저장할 CSV 행을 선택해 주세요.');
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage('');
+
+    try {
+      let createdCount = 0;
+      for (const row of rowsToSave) {
+        const weekTypes = row.weekSelection === 'ALL' ? ['THIS_WEEK', 'NEXT_WEEK'] : [row.weekSelection];
+        for (const weekType of weekTypes) {
+          await requestApi('/api/report-items', {
+            body: {
+              reportStartDate: weekRange.startDate,
+              reportEndDate: weekRange.endDate,
+              weekType,
+              unitTask: row.unitTask,
+              title: row.title,
+              detailContent: row.title,
+              progressContent: row.progressContent,
+              status: row.completed ? 'DONE' : row.status,
+              progressRate: row.progressRate,
+              dueDate: row.dueDate || null,
+              completed: row.completed,
+              saveStatus: 'SAVED',
+            },
+            token,
+          });
+          createdCount += 1;
+        }
+      }
+
+      setCsvRows([]);
+      setCsvFileName('');
+      setMessage(`CSV에서 ${createdCount}개 업무 항목을 저장했습니다.`);
+      await loadReportItems();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function loadReportItems() {
@@ -216,6 +305,75 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <span>보고 기간</span>
             <strong>{formatDate(weekRange.startDate)} ~ {formatDate(weekRange.endDate)}</strong>
           </div>
+        </div>
+
+        <div className="csv-upload-panel">
+          <div className="csv-upload-actions">
+            <label>
+              CSV 업로드
+              <input type="file" accept=".csv,text/csv" onChange={handleCsvFileChange} disabled={isLoading} />
+            </label>
+            <button className="secondary-button" type="button" onClick={() => setCsvRows([])} disabled={csvRows.length === 0 || isLoading}>
+              업로드 행 지우기
+            </button>
+          </div>
+          <p className="helper-text">
+            CSV 양식은 원본 PMS 파일의 제목, 상태, 범주, 진척도 컬럼을 사용합니다. 주차 구분은 업로드 후 행별로 선택합니다.
+          </p>
+
+          {csvRows.length > 0 && (
+            <div className="items-table-wrap csv-table-wrap">
+              <div className="csv-table-summary">
+                <strong>{csvFileName}</strong>
+                <button className="primary-button compact" type="button" onClick={saveCsvRows} disabled={isLoading}>
+                  선택 행 저장
+                </button>
+              </div>
+              <table className="items-table csv-items-table" aria-label="CSV 업로드 대기 목록">
+                <thead>
+                  <tr>
+                    <th scope="col">저장</th>
+                    <th scope="col">주차</th>
+                    <th scope="col">단위업무</th>
+                    <th scope="col">세부사항</th>
+                    <th scope="col">상태</th>
+                    <th scope="col">진척도</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvRows.map((row) => (
+                    <tr key={row.tempId}>
+                      <td>
+                        <label className="check-label table-check">
+                          <input
+                            type="checkbox"
+                            aria-label={`${row.title} 저장 선택`}
+                            checked={row.selected}
+                            onChange={(event) => updateCsvRow(row.tempId, 'selected', event.target.checked)}
+                          />
+                        </label>
+                      </td>
+                      <td>
+                        <select
+                          aria-label={`${row.title} 주차 구분`}
+                          value={row.weekSelection}
+                          onChange={(event) => updateCsvRow(row.tempId, 'weekSelection', event.target.value)}
+                        >
+                          {Object.entries(csvWeekSelectionLabels).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>{row.unitTask}</td>
+                      <td>{row.title}</td>
+                      <td>{statusLabels[row.status]}</td>
+                      <td>{row.progressRate}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <form className="report-form" onSubmit={handleReportSubmit}>
