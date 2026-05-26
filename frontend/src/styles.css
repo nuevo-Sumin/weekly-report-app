@@ -269,6 +269,18 @@ textarea:focus {
   gap: 10px;
 }
 
+.email-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(150px, 0.9fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.email-field-row span {
+  color: #274c34;
+  font-weight: 800;
+}
+
 .status-message {
   margin: 20px 0 0;
   padding: 12px 14px;
@@ -532,7 +544,8 @@ textarea:focus {
   }
 
   .form-row,
-  .button-row {
+  .button-row,
+  .email-field-row {
     align-items: flex-start;
     grid-template-columns: 1fr;
     flex-direction: column;

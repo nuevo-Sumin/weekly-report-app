@@ -149,11 +149,25 @@ function App() {
 
   async function handleSignup(event) {
     event.preventDefault();
-    setIsLoading(true);
     setMessage('');
 
+    if (signupForm.password !== signupForm.passwordConfirm) {
+      setMessage('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+
+    const signupBody = {
+      loginId: signupForm.loginId,
+      password: signupForm.password,
+      email: `${signupForm.emailLocal}@${signupForm.emailDomain}`,
+      name: signupForm.name,
+      requestedRole: signupForm.requestedRole,
+    };
+
+    setIsLoading(true);
+
     try {
-      const data = await requestApi('/api/auth/signup', { body: signupForm });
+      const data = await requestApi('/api/auth/signup', { body: signupBody });
       const managerNotice = data.roleApprovalStatus === 'PENDING'
         ? ' PL 권한은 관리자 승인 후 적용됩니다.'
         : '';

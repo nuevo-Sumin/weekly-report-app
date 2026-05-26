@@ -7,7 +7,9 @@ export const initialLoginForm = {
 export const initialSignupForm = {
   loginId: '',
   password: '',
-  email: '',
+  passwordConfirm: '',
+  emailLocal: '',
+  emailDomain: 'metabuild.co.kr',
   name: '',
   requestedRole: 'USER',
 };
@@ -40,4 +42,3 @@ export const weekTypeLabels = {
   THIS_WEEK: '금주',
   NEXT_WEEK: '차주',
 };
-

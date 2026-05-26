@@ -109,7 +109,23 @@ function AuthPanel({
               placeholder="문자와 숫자 포함 8자 이상"
               minLength={8}
               maxLength={100}
-              pattern="^(?=.*[A-Za-z])(?=.*\d).+$"
+              pattern="^(?=.*[A-Za-z])(?=.*[0-9]).+$"
+              title="문자와 숫자를 각각 1개 이상 포함해야 합니다."
+              required
+            />
+          </label>
+
+          <label>
+            비밀번호 확인
+            <input
+              autoComplete="new-password"
+              type="password"
+              value={signupForm.passwordConfirm}
+              onChange={(event) => onSignupChange('passwordConfirm', event.target.value)}
+              placeholder="비밀번호 다시 입력"
+              minLength={8}
+              maxLength={100}
+              pattern="^(?=.*[A-Za-z])(?=.*[0-9]).+$"
               title="문자와 숫자를 각각 1개 이상 포함해야 합니다."
               required
             />
@@ -117,14 +133,27 @@ function AuthPanel({
 
           <label>
             이메일
-            <input
-              autoComplete="email"
-              type="email"
-              value={signupForm.email}
-              onChange={(event) => onSignupChange('email', event.target.value)}
-              placeholder="name@example.com"
-              required
-            />
+            <div className="email-field-row">
+              <input
+                autoComplete="email"
+                value={signupForm.emailLocal}
+                onChange={(event) => onSignupChange('emailLocal', event.target.value)}
+                placeholder="아이디"
+                maxLength={80}
+                pattern="^[a-zA-Z0-9._-]+$"
+                title="영문, 숫자, 점, 밑줄, 하이픈만 사용할 수 있습니다."
+                required
+              />
+              <span>@</span>
+              <select
+                value={signupForm.emailDomain}
+                onChange={(event) => onSignupChange('emailDomain', event.target.value)}
+                aria-label="이메일 도메인"
+              >
+                <option value="metabuild.co.kr">metabuild.co.kr</option>
+                <option value="1388.or.kr">1388.or.kr</option>
+              </select>
+            </div>
           </label>
 
           <label>

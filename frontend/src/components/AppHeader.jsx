@@ -2,9 +2,9 @@ function AppHeader({ isAuthenticated, user, onLogout }) {
   return (
     <div className="topbar">
       <div className="brand-block">
-        <p className="eyebrow">Metabuild PMS</p>
+        <p className="eyebrow">청소년안전망시스템 YouthSafety</p>
         <h1 id="page-title">주간업무보고</h1>
-        <p className="brand-copy">팀원의 주간 업무를 입력하고 단위업무별 보고 텍스트로 정리합니다.</p>
+        <p className="brand-copy">개발자 주간보고 제출 및 취합용</p>
       </div>
 
       {isAuthenticated && (
