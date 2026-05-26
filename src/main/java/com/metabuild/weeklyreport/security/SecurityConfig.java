@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/health", "/api/auth/**").permitAll()
                         .requestMatchers("/api/me").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("MANAGER")
+                        .requestMatchers("/api/merged-reports/**").authenticated()
                         .requestMatchers("/api/report-items/**").authenticated()
                         .anyRequest().denyAll()
                 )

@@ -18,6 +18,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [mergedText, setMergedText] = useState(null);
+  const [mergedReportId, setMergedReportId] = useState(null);
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const automaticPreview = useMemo(() => buildAdminPreview(items, selectedIds), [items, selectedIds]);
@@ -31,6 +32,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   function updateFilter(field, value) {
     setFilters((current) => ({ ...current, [field]: value }));
     setMergedText(null);
+    setMergedReportId(null);
   }
 
   function buildQuery(activeFilters = filters) {
@@ -65,6 +67,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       setItems(data);
       setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id)));
       setMergedText(null);
+      setMergedReportId(null);
     } catch (error) {
       if (requestId === latestRequestId.current) {
         setMessage(error.message);
@@ -86,11 +89,13 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setFilters(nextFilters);
     setSelectedIds([]);
     setMergedText(null);
+    setMergedReportId(null);
     loadSubmittedItems(nextFilters);
   }
 
   function toggleSelected(id) {
     setMergedText(null);
+    setMergedReportId(null);
     setSelectedIds((current) => (
       current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
     ));
@@ -104,6 +109,36 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
 
     setMergedText(automaticPreview);
     setMessage('선택한 항목을 단위업무별로 병합했습니다.');
+  }
+
+  async function saveMergedReport() {
+    if (selectedIds.length === 0 || !mergedText?.trim()) {
+      setMessage('저장할 병합 결과를 먼저 생성해 주세요.');
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage('');
+
+    try {
+      const body = {
+        mergeType: 'ADMIN',
+        reportStartDate: weekRange.startDate,
+        reportEndDate: weekRange.endDate,
+        mergedText,
+        status: 'SAVED',
+      };
+      const path = mergedReportId ? `/api/merged-reports/${mergedReportId}` : '/api/merged-reports';
+      const method = mergedReportId ? 'PUT' : 'POST';
+      const data = await requestApi(path, { method, body, token });
+      setMergedText(data.mergedText);
+      setMergedReportId(data.id);
+      setMessage(mergedReportId ? '취합 결과를 수정 저장했습니다.' : '취합 결과를 저장했습니다.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function copyMergedText() {
@@ -252,7 +287,10 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
             <button className="secondary-button" type="button" onClick={mergeSelectedItems} disabled={selectedIds.length === 0}>
               병합
             </button>
-          <button className="primary-button compact" type="button" onClick={copyMergedText} disabled={!mergedText?.trim()}>
+            <button className="secondary-button" type="button" onClick={saveMergedReport} disabled={!mergedText?.trim() || isLoading}>
+              {mergedReportId ? '수정 저장' : '저장'}
+            </button>
+            <button className="primary-button compact" type="button" onClick={copyMergedText} disabled={!mergedText?.trim()}>
               복사
             </button>
           </div>

@@ -10,6 +10,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [reportForm, setReportForm] = useState(initialReportForm);
+  const [mergedReportId, setMergedReportId] = useState(null);
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
@@ -38,6 +39,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       });
       setItems(data);
       setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id && item.saveStatus === 'SAVED')));
+      setMergedReportId(null);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -135,6 +137,36 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setSelectedIds((current) => (
       current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
     ));
+    setMergedReportId(null);
+  }
+
+  async function saveMergedReport() {
+    if (selectedIds.length === 0) {
+      setMessage('저장할 병합 항목을 선택해 주세요.');
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage('');
+
+    try {
+      const body = {
+        mergeType: 'MEMBER',
+        reportStartDate: weekRange.startDate,
+        reportEndDate: weekRange.endDate,
+        mergedText: previewText,
+        status: 'SAVED',
+      };
+      const path = mergedReportId ? `/api/merged-reports/${mergedReportId}` : '/api/merged-reports';
+      const method = mergedReportId ? 'PUT' : 'POST';
+      const data = await requestApi(path, { method, body, token });
+      setMergedReportId(data.id);
+      setMessage(mergedReportId ? '병합 결과를 수정 저장했습니다.' : '병합 결과를 저장했습니다.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function copyPreview() {
@@ -352,9 +384,14 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <p className="panel-label">미리보기</p>
             <h2>단위업무별 병합 결과</h2>
           </div>
-          <button className="secondary-button" type="button" onClick={copyPreview} disabled={selectedIds.length === 0}>
-            복사
-          </button>
+          <div className="button-row compact-actions">
+            <button className="secondary-button" type="button" onClick={saveMergedReport} disabled={selectedIds.length === 0 || isLoading}>
+              {mergedReportId ? '수정 저장' : '저장'}
+            </button>
+            <button className="primary-button compact" type="button" onClick={copyPreview} disabled={selectedIds.length === 0}>
+              복사
+            </button>
+          </div>
         </div>
         <pre>{previewText}</pre>
       </section>
