@@ -67,7 +67,7 @@ class AuthIntegrationTest {
     void publicAuthEndpointIgnoresInvalidBearerToken() throws Exception {
         SignupRequest signupRequest = new SignupRequest(
                 "publictoken",
-                "password123",
+                "1234",
                 "publictoken@example.com",
                 "Public Token"
         );
@@ -84,7 +84,7 @@ class AuthIntegrationTest {
     void managerSignupRequiresApprovalBeforeRoleIsGranted() throws Exception {
         SignupRequest signupRequest = new SignupRequest(
                 "managerrequest",
-                "password123",
+                "1234",
                 "managerrequest@example.com",
                 "Manager Request",
                 UserRole.MANAGER
@@ -99,7 +99,7 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.data.requestedRole").value("MANAGER"))
                 .andExpect(jsonPath("$.data.roleApprovalStatus").value("PENDING"));
 
-        LoginRequest loginRequest = new LoginRequest("managerrequest", "password123");
+        LoginRequest loginRequest = new LoginRequest("managerrequest", "1234");
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
@@ -119,10 +119,27 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.data.roleApprovalStatus").value("PENDING"));
     }
 
+    @Test
+    void signupRejectsPasswordThatIsNotFourDigitsWithKoreanMessage() throws Exception {
+        SignupRequest signupRequest = new SignupRequest(
+                "badpassword",
+                "password123",
+                "badpassword@example.com",
+                "Bad Password"
+        );
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signupRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("password: 비밀번호는 숫자 4자리로 입력해 주세요."));
+    }
+
     private String signupAndLogin(String loginId) throws Exception {
         SignupRequest signupRequest = new SignupRequest(
                 loginId,
-                "password123",
+                "1234",
                 loginId + "@example.com",
                 "Test User"
         );
@@ -131,7 +148,7 @@ class AuthIntegrationTest {
                         .content(objectMapper.writeValueAsString(signupRequest)))
                 .andExpect(status().isCreated());
 
-        LoginRequest loginRequest = new LoginRequest(loginId, "password123");
+        LoginRequest loginRequest = new LoginRequest(loginId, "1234");
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))

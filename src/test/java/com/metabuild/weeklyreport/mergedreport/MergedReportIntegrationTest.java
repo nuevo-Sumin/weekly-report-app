@@ -212,7 +212,7 @@ class MergedReportIntegrationTest {
     private String signupAndLogin(String loginId) throws Exception {
         SignupRequest signupRequest = new SignupRequest(
                 loginId,
-                "password123",
+                "1234",
                 loginId + "@example.com",
                 "Merged User"
         );
@@ -233,7 +233,7 @@ class MergedReportIntegrationTest {
         User user = new User(
                 loginId,
                 loginId + "@example.com",
-                passwordEncoder.encode("password123"),
+                passwordEncoder.encode("1234"),
                 role == UserRole.MANAGER ? "Merged Manager" : "Merged User",
                 role,
                 role,
@@ -243,7 +243,7 @@ class MergedReportIntegrationTest {
     }
 
     private String login(String loginId) throws Exception {
-        LoginRequest loginRequest = new LoginRequest(loginId, "password123");
+        LoginRequest loginRequest = new LoginRequest(loginId, "1234");
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))

@@ -324,7 +324,7 @@ class WeeklyReportItemIntegrationTest {
     private String signupAndLogin(String loginId) throws Exception {
         SignupRequest signupRequest = new SignupRequest(
                 loginId,
-                "password123",
+                "1234",
                 loginId + "@example.com",
                 "Report User"
         );
@@ -333,7 +333,7 @@ class WeeklyReportItemIntegrationTest {
                         .content(objectMapper.writeValueAsString(signupRequest)))
                 .andExpect(status().isCreated());
 
-        LoginRequest loginRequest = new LoginRequest(loginId, "password123");
+        LoginRequest loginRequest = new LoginRequest(loginId, "1234");
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
