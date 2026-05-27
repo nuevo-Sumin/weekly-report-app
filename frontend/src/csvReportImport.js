@@ -106,6 +106,10 @@ function parseProgressRate(rawProgressRate, rowNumber) {
     return 0;
   }
 
+  if (!/^\d+$/.test(normalized)) {
+    throw new Error(`${rowNumber}행의 진척도는 0부터 100 사이여야 합니다.`);
+  }
+
   const progressRate = Number.parseInt(normalized, 10);
   if (Number.isNaN(progressRate) || progressRate < 0 || progressRate > 100) {
     throw new Error(`${rowNumber}행의 진척도는 0부터 100 사이여야 합니다.`);
@@ -185,18 +189,13 @@ export function parseReportCsv(text) {
 }
 
 export function parseReportCsvBuffer(buffer) {
-  const encodings = ['utf-8', 'euc-kr'];
-  let lastError = null;
+  let text;
 
-  for (const encoding of encodings) {
-    try {
-      const decoderOptions = encoding === 'utf-8' ? { fatal: true } : undefined;
-      const text = new TextDecoder(encoding, decoderOptions).decode(buffer).replace(/^\uFEFF/, '');
-      return parseReportCsv(text);
-    } catch (error) {
-      lastError = error;
-    }
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch (error) {
+    text = new TextDecoder('euc-kr').decode(buffer);
   }
 
-  throw lastError ?? new Error('CSV 파일을 읽지 못했습니다.');
+  return parseReportCsv(text.replace(/^\uFEFF/, ''));
 }

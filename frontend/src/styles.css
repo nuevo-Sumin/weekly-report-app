@@ -417,7 +417,7 @@ textarea:focus {
 
 .csv-result {
   display: grid;
-  grid-template-columns: minmax(58px, auto) minmax(0, 1fr) minmax(160px, 1.2fr);
+  grid-template-columns: minmax(48px, auto) minmax(58px, auto) minmax(0, 1fr) minmax(160px, 1.2fr);
   gap: 10px;
   margin: 0;
   padding: 10px 12px;

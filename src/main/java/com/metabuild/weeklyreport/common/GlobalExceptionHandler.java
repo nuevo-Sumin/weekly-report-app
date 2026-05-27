@@ -42,7 +42,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String message = ex.getMostSpecificCause().getMessage();
-        if (message != null && message.contains("UK_REPORT_ITEM_CSV_SOURCE")) {
+        if (message != null && message.toLowerCase().contains("uk_report_item_csv_source")) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(ApiResponse.error("CSV row has already been saved for this report period and week type."));
         }

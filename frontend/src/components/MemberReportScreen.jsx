@@ -41,6 +41,16 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     return selectedWeekTypes.filter((weekType) => !row.savedWeekTypes?.includes(weekType));
   }
 
+  function getSavedCsvWeekTypes(row, itemList = items) {
+    return itemList
+      .filter((item) => item.sourceType === 'CSV' && item.sourceKey === row.sourceKey)
+      .map((item) => item.weekType);
+  }
+
+  function isDuplicateCsvMessage(message) {
+    return String(message ?? '').includes('CSV row has already been saved');
+  }
+
   function handleCsvFileChange(event) {
     const [file] = event.target.files;
     if (!file) {
@@ -56,7 +66,10 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     reader.onload = () => {
       try {
         const rows = parseReportCsvBuffer(reader.result);
-        setCsvRows(rows);
+        setCsvRows(rows.map((row) => ({
+          ...row,
+          savedWeekTypes: getSavedCsvWeekTypes(row),
+        })));
         setCsvFileName(file.name);
         setCsvSaveResults([]);
         setMessage(`${rows.length}개 CSV 행을 불러왔습니다. 행별 주차 구분을 확인해 주세요.`);
@@ -139,6 +152,20 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               message: '저장됨',
             });
           } catch (error) {
+            if (isDuplicateCsvMessage(error.message)) {
+              savedWeekTypesByRow[row.tempId] = [...(savedWeekTypesByRow[row.tempId] ?? []), weekType];
+              results.push({
+                key: `${row.tempId}-${weekType}`,
+                status: 'success',
+                title: row.title,
+                sourceKey: row.sourceKey,
+                sourceRowNumber: row.sourceRowNumber,
+                weekType,
+                message: '이미 저장됨',
+              });
+              continue;
+            }
+
             failedCount += 1;
             results.push({
               key: `${row.tempId}-${weekType}`,
@@ -448,9 +475,10 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
           )}
 
           {csvSaveResults.length > 0 && (
-            <div className="csv-result-list" aria-label="CSV 저장 결과">
+            <div className="csv-result-list" role="status" aria-live="polite" aria-label="CSV save results">
               {csvSaveResults.map((result) => (
                 <p key={result.key} className={`csv-result ${result.status}`}>
+                  <span>{result.status === 'success' ? '성공' : '실패'}</span>
                   <strong>{weekTypeLabels[result.weekType]}</strong>
                   <span>#{result.sourceKey} / {result.sourceRowNumber}행 / {result.title}</span>
                   <span>{result.message}</span>
