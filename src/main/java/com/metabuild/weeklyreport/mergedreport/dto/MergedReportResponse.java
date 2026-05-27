@@ -5,6 +5,7 @@ import com.metabuild.weeklyreport.mergedreport.entity.MergedReport;
 import com.metabuild.weeklyreport.mergedreport.entity.MergedReportStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record MergedReportResponse(
         Long id,
@@ -15,11 +16,16 @@ public record MergedReportResponse(
         LocalDate reportEndDate,
         String mergedText,
         MergedReportStatus status,
+        List<Long> sourceItemIds,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
 
     public static MergedReportResponse from(MergedReport report) {
+        return from(report, List.of());
+    }
+
+    public static MergedReportResponse from(MergedReport report, List<Long> sourceItemIds) {
         return new MergedReportResponse(
                 report.getId(),
                 report.getCreatedBy().getId(),
@@ -29,6 +35,7 @@ public record MergedReportResponse(
                 report.getReportEndDate(),
                 report.getMergedText(),
                 report.getStatus(),
+                sourceItemIds,
                 report.getCreatedAt(),
                 report.getUpdatedAt()
         );

@@ -24,6 +24,10 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const automaticPreview = useMemo(() => buildAdminPreview(items, selectedIds), [items, selectedIds]);
+  const hiddenSelectedCount = useMemo(
+    () => selectedIds.filter((id) => !items.some((item) => item.id === id)).length,
+    [items, selectedIds],
+  );
 
   useEffect(() => {
     if (token) {
@@ -143,6 +147,10 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       setMessage('병합할 항목을 선택해 주세요.');
       return;
     }
+    if (hiddenSelectedCount > 0) {
+      setMessage('현재 필터에 보이지 않는 원본 항목이 있어 재병합할 수 없습니다. 필터를 초기화한 뒤 다시 불러와 주세요.');
+      return;
+    }
 
     setMergedReportId(null);
     setMergedText(automaticPreview);
@@ -169,6 +177,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
         reportEndDate: weekRange.endDate,
         mergedText,
         status: 'SAVED',
+        sourceItemIds: selectedIds,
       };
       const path = mergedReportId ? `/api/merged-reports/${mergedReportId}` : '/api/merged-reports';
       const method = mergedReportId ? 'PUT' : 'POST';
@@ -187,7 +196,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   function loadSavedMergedReport(report) {
     setMergedReportId(report.id);
     setMergedText(report.mergedText);
-    setSelectedIds([]);
+    setSelectedIds(report.sourceItemIds ?? []);
     setMessage('저장된 취합 결과를 불러왔습니다.');
   }
 

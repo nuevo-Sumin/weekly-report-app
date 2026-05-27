@@ -30,6 +30,20 @@ public interface WeeklyReportItemRepository extends JpaRepository<WeeklyReportIt
 
     List<WeeklyReportItem> findByAuthorAndIdIn(User author, Collection<Long> ids);
 
+    List<WeeklyReportItem> findByAuthorAndReportStartDateAndReportEndDateAndIdIn(
+            User author,
+            LocalDate reportStartDate,
+            LocalDate reportEndDate,
+            Collection<Long> ids
+    );
+
+    List<WeeklyReportItem> findByReportStartDateAndReportEndDateAndSaveStatusAndIdIn(
+            LocalDate reportStartDate,
+            LocalDate reportEndDate,
+            SaveStatus saveStatus,
+            Collection<Long> ids
+    );
+
     Optional<WeeklyReportItem> findByAuthorAndId(User author, Long id);
 
     boolean existsByAuthorAndReportStartDateAndReportEndDateAndWeekTypeAndSourceTypeAndSourceKey(

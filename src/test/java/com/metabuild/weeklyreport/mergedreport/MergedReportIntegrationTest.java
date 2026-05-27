@@ -15,11 +15,17 @@ import com.metabuild.weeklyreport.mergedreport.entity.MergeType;
 import com.metabuild.weeklyreport.mergedreport.entity.MergedReport;
 import com.metabuild.weeklyreport.mergedreport.entity.MergedReportStatus;
 import com.metabuild.weeklyreport.mergedreport.repository.MergedReportRepository;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
+import com.metabuild.weeklyreport.reportitem.entity.WeekType;
+import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
+import com.metabuild.weeklyreport.reportitem.repository.WeeklyReportItemRepository;
 import com.metabuild.weeklyreport.user.entity.RoleApprovalStatus;
 import com.metabuild.weeklyreport.user.entity.User;
 import com.metabuild.weeklyreport.user.entity.UserRole;
 import com.metabuild.weeklyreport.user.repository.UserRepository;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -53,6 +59,9 @@ class MergedReportIntegrationTest {
 
     @Autowired
     private MergedReportRepository mergedReportRepository;
+
+    @Autowired
+    private WeeklyReportItemRepository reportItemRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -141,6 +150,134 @@ class MergedReportIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.mergeType").value("ADMIN"))
                 .andExpect(jsonPath("$.data.status").value("FINAL"));
+    }
+
+    @Test
+    void userCanSaveAndReloadSourceReportItemIds() throws Exception {
+        User user = createUser("sourcesmember", UserRole.USER);
+        WeeklyReportItem firstItem = createReportItem(user, "Source Task A", SaveStatus.SAVED);
+        WeeklyReportItem secondItem = createReportItem(user, "Source Task B", SaveStatus.SAVED);
+        String token = login("sourcesmember");
+
+        MergedReportRequest request = new MergedReportRequest(
+                MergeType.MEMBER,
+                REPORT_START_DATE,
+                REPORT_END_DATE,
+                "source merged text",
+                MergedReportStatus.SAVED,
+                List.of(secondItem.getId(), firstItem.getId())
+        );
+
+        MvcResult createResult = mockMvc.perform(post("/api/merged-reports")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sourceItemIds.length()").value(2))
+                .andReturn();
+
+        Long reportId = objectMapper.readTree(createResult.getResponse().getContentAsString())
+                .path("data")
+                .path("id")
+                .asLong();
+
+        mockMvc.perform(get("/api/merged-reports")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .param("reportStartDate", REPORT_START_DATE.toString())
+                        .param("reportEndDate", REPORT_END_DATE.toString())
+                        .param("mergeType", "MEMBER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(reportId))
+                .andExpect(jsonPath("$.data[0].sourceItemIds.length()").value(2));
+    }
+
+    @Test
+    void userCanUpdateMergedReportWithSameSourceReportItemIds() throws Exception {
+        User user = createUser("updatesources", UserRole.USER);
+        WeeklyReportItem item = createReportItem(user, "Update Source Task", SaveStatus.SAVED);
+        String token = login("updatesources");
+
+        MergedReportRequest createRequest = new MergedReportRequest(
+                MergeType.MEMBER,
+                REPORT_START_DATE,
+                REPORT_END_DATE,
+                "source text",
+                MergedReportStatus.SAVED,
+                List.of(item.getId())
+        );
+        Long reportId = createMergedReport(token, createRequest);
+
+        MergedReportRequest updateRequest = new MergedReportRequest(
+                MergeType.MEMBER,
+                REPORT_START_DATE,
+                REPORT_END_DATE,
+                "updated source text",
+                MergedReportStatus.SAVED,
+                List.of(item.getId())
+        );
+
+        mockMvc.perform(put("/api/merged-reports/{reportId}", reportId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sourceItemIds.length()").value(1));
+    }
+
+    @Test
+    void userCannotLinkAnotherUsersSourceReportItem() throws Exception {
+        User owner = createUser("sourceowner", UserRole.USER);
+        User attacker = createUser("sourceattacker", UserRole.USER);
+        WeeklyReportItem ownerItem = createReportItem(owner, "Owner Source Task", SaveStatus.SAVED);
+        String attackerToken = login("sourceattacker");
+
+        MergedReportRequest request = new MergedReportRequest(
+                MergeType.MEMBER,
+                REPORT_START_DATE,
+                REPORT_END_DATE,
+                "attack source text",
+                MergedReportStatus.SAVED,
+                List.of(ownerItem.getId())
+        );
+
+        mockMvc.perform(post("/api/merged-reports")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + attackerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void userCannotMoveMergedReportPeriodWithoutUpdatingSourceReportItems() throws Exception {
+        User user = createUser("movesources", UserRole.USER);
+        WeeklyReportItem item = createReportItem(user, "Move Source Task", SaveStatus.SAVED);
+        String token = login("movesources");
+
+        MergedReportRequest createRequest = new MergedReportRequest(
+                MergeType.MEMBER,
+                REPORT_START_DATE,
+                REPORT_END_DATE,
+                "source text",
+                MergedReportStatus.SAVED,
+                List.of(item.getId())
+        );
+        Long reportId = createMergedReport(token, createRequest);
+
+        MergedReportRequest moveRequest = new MergedReportRequest(
+                MergeType.MEMBER,
+                REPORT_START_DATE.plusWeeks(1),
+                REPORT_END_DATE.plusWeeks(1),
+                "moved source text",
+                MergedReportStatus.SAVED
+        );
+
+        mockMvc.perform(put("/api/merged-reports/{reportId}", reportId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(moveRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
@@ -240,6 +377,28 @@ class MergedReportIntegrationTest {
                 RoleApprovalStatus.APPROVED
         );
         return userRepository.save(user);
+    }
+
+    private WeeklyReportItem createReportItem(User author, String title, SaveStatus saveStatus) {
+        WeeklyReportItem item = new WeeklyReportItem(
+                author,
+                REPORT_START_DATE,
+                REPORT_END_DATE,
+                WeekType.THIS_WEEK,
+                "Unit Task",
+                title,
+                title,
+                "Progress",
+                ReportItemStatus.IN_PROGRESS,
+                50,
+                null,
+                false,
+                null,
+                null,
+                null,
+                saveStatus
+        );
+        return reportItemRepository.save(item);
     }
 
     private String login(String loginId) throws Exception {

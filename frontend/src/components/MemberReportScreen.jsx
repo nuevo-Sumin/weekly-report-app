@@ -361,7 +361,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   function loadSavedMergedReport(report) {
     setMergedReportId(report.id);
     setMergedText(report.mergedText);
-    setSelectedIds([]);
+    setSelectedIds(report.sourceItemIds ?? []);
     setMessage('저장된 병합 결과를 불러왔습니다.');
   }
 
@@ -385,6 +385,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         reportEndDate: weekRange.endDate,
         mergedText: activeMergedText,
         status: 'SAVED',
+        sourceItemIds: selectedIds,
       };
       const path = mergedReportId ? `/api/merged-reports/${mergedReportId}` : '/api/merged-reports';
       const method = mergedReportId ? 'PUT' : 'POST';
