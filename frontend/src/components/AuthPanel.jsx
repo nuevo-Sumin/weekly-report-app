@@ -93,7 +93,7 @@ function AuthPanel({
               placeholder="영문, 숫자 4자 이상"
               minLength={4}
               maxLength={80}
-              pattern="^[a-zA-Z0-9._-]+$"
+              pattern="[A-Za-z0-9._\\-]+"
               title="영문, 숫자, 점, 밑줄, 하이픈만 사용할 수 있습니다."
               required
             />
@@ -109,7 +109,7 @@ function AuthPanel({
               placeholder="4자리 숫자"
               minLength={4}
               maxLength={4}
-              pattern="^\d{4}$"
+              pattern="[0-9]{4}"
               title="숫자 4자리 입력하세요."
               required
             />
@@ -125,7 +125,7 @@ function AuthPanel({
               placeholder="비밀번호 다시 입력"
               minLength={4}
               maxLength={4}
-              pattern="^\d{4}$"
+              pattern="[0-9]{4}"
               title="숫자 4자리 입력하세요."
               required
             />
@@ -140,7 +140,7 @@ function AuthPanel({
                 onChange={(event) => onSignupChange('emailLocal', event.target.value)}
                 placeholder="아이디"
                 maxLength={80}
-                pattern="^[a-zA-Z0-9._-]+$"
+                pattern="[A-Za-z0-9._\\-]+"
                 title="영문, 숫자, 점, 밑줄, 하이픈만 사용할 수 있습니다."
                 required
               />

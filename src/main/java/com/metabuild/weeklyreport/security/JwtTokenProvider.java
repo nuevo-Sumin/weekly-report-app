@@ -16,19 +16,18 @@ import org.springframework.util.StringUtils;
 @Component
 public class JwtTokenProvider {
 
-    private final String secret;
+    private final SecretKey signingKey;
     private final long expiration;
 
     public JwtTokenProvider(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration}") long expiration
     ) {
-        this.secret = secret;
+        this.signingKey = createSigningKey(secret);
         this.expiration = expiration;
     }
 
     public String createAccessToken(User user) {
-        SecretKey key = signingKey();
         Instant now = Instant.now();
         Instant expiresAt = now.plusMillis(expiration);
 
@@ -38,7 +37,7 @@ public class JwtTokenProvider {
                 .claim("role", user.getRole().name())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
-                .signWith(key)
+                .signWith(signingKey)
                 .compact();
     }
 
@@ -57,14 +56,17 @@ public class JwtTokenProvider {
 
     private Claims parseClaims(String token) {
         return Jwts.parser()
-                .verifyWith(signingKey())
+                .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
     }
 
-    private SecretKey signingKey() {
-        if (!StringUtils.hasText(secret) || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+    private SecretKey createSigningKey(String secret) {
+        if (!StringUtils.hasText(secret)) {
+            return Jwts.SIG.HS256.key().build();
+        }
+        if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("jwt.secret must be at least 32 bytes.");
         }
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
