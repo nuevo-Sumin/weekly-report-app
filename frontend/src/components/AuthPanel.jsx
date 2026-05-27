@@ -51,13 +51,13 @@ function AuthPanel({
           </label>
 
           <label>
-            패스워드
+            비밀번호
             <input
               autoComplete="current-password"
               type="password"
               value={loginForm.password}
               onChange={(event) => onLoginChange('password', event.target.value)}
-              placeholder="패스워드 입력"
+              placeholder="숫자 4자리 비밀번호 입력"
               required
             />
           </label>
@@ -100,17 +100,17 @@ function AuthPanel({
           </label>
 
           <label>
-            패스워드
+            비밀번호
             <input
               autoComplete="new-password"
               type="password"
               value={signupForm.password}
               onChange={(event) => onSignupChange('password', event.target.value)}
-              placeholder="문자와 숫자 포함 8자 이상"
-              minLength={8}
-              maxLength={100}
-              pattern="^(?=.*[A-Za-z])(?=.*[0-9]).+$"
-              title="문자와 숫자를 각각 1개 이상 포함해야 합니다."
+              placeholder="4자리 숫자"
+              minLength={4}
+              maxLength={4}
+              pattern="^\d{4}$"
+              title="숫자 4자리 입력하세요."
               required
             />
           </label>
@@ -123,10 +123,10 @@ function AuthPanel({
               value={signupForm.passwordConfirm}
               onChange={(event) => onSignupChange('passwordConfirm', event.target.value)}
               placeholder="비밀번호 다시 입력"
-              minLength={8}
-              maxLength={100}
-              pattern="^(?=.*[A-Za-z])(?=.*[0-9]).+$"
-              title="문자와 숫자를 각각 1개 이상 포함해야 합니다."
+              minLength={4}
+              maxLength={4}
+              pattern="^\d{4}$"
+              title="숫자 4자리 입력하세요."
               required
             />
           </label>
@@ -151,7 +151,7 @@ function AuthPanel({
                 aria-label="이메일 도메인"
               >
                 <option value="metabuild.co.kr">metabuild.co.kr</option>
-                <option value="1388.or.kr">1388.or.kr</option>
+                <option value="1388.or.kr">1388.kr</option>
               </select>
             </div>
           </label>
@@ -162,8 +162,8 @@ function AuthPanel({
               autoComplete="name"
               value={signupForm.name}
               onChange={(event) => onSignupChange('name', event.target.value)}
-              placeholder="사용자 이름"
-              maxLength={80}
+              placeholder="사용자 이름(실명)"
+              maxLength={5}
               required
             />
           </label>
@@ -174,8 +174,8 @@ function AuthPanel({
               value={signupForm.requestedRole}
               onChange={(event) => onSignupChange('requestedRole', event.target.value)}
             >
-              <option value="USER">개발자(팀원)</option>
-              <option value="MANAGER">PL(팀장) 승인 요청</option>
+              <option value="USER">개발자</option>
+              <option value="MANAGER">PL</option>
             </select>
           </label>
 

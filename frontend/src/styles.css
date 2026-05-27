@@ -557,6 +557,50 @@ textarea:focus {
 
 .compact-actions {
   min-width: 220px;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+.saved-report-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.saved-report-button {
+  display: grid;
+  grid-template-columns: minmax(70px, auto) minmax(110px, auto) minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #d5e4d7;
+  border-radius: 6px;
+  background: #fbfdfb;
+  color: #274c34;
+  text-align: left;
+}
+
+.saved-report-button:hover,
+.saved-report-button.active {
+  border-color: #2f8f4e;
+  background: #e3f0e5;
+}
+
+.saved-report-button span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty-list {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #d5e4d7;
+  border-radius: 6px;
+  background: #f7fbf8;
+  color: #4d6655;
+  font-weight: 700;
+  text-align: center;
 }
 
 .preview-panel pre {
@@ -627,7 +671,8 @@ textarea:focus {
   .email-field-row,
   .csv-upload-actions,
   .csv-table-summary,
-  .csv-result {
+  .csv-result,
+  .saved-report-button {
     align-items: flex-start;
     grid-template-columns: 1fr;
     flex-direction: column;

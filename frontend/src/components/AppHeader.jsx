@@ -4,7 +4,7 @@ function AppHeader({ isAuthenticated, user, onLogout }) {
       <div className="brand-block">
         <p className="eyebrow">청소년안전망시스템 YouthSafety</p>
         <h1 id="page-title">주간업무보고</h1>
-        <p className="brand-copy">개발자 주간보고 제출 및 취합용</p>
+        <p className="brand-copy">개발자 주간보고 제출 및 PL 취합</p>
       </div>
 
       {isAuthenticated && (

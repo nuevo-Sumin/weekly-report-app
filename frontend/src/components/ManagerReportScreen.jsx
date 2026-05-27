@@ -13,19 +13,23 @@ const initialFilters = {
 function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   const today = useMemo(() => toDateInputValue(new Date()), []);
   const latestRequestId = useRef(0);
+  const latestMergedReportsRequestId = useRef(0);
   const [baseDate, setBaseDate] = useState(today);
   const [filters, setFilters] = useState(initialFilters);
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [mergedText, setMergedText] = useState(null);
   const [mergedReportId, setMergedReportId] = useState(null);
+  const [savedMergedReports, setSavedMergedReports] = useState([]);
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const automaticPreview = useMemo(() => buildAdminPreview(items, selectedIds), [items, selectedIds]);
 
   useEffect(() => {
     if (token) {
+      setSavedMergedReports([]);
       loadSubmittedItems();
+      loadMergedReports();
     }
   }, [token, weekRange.startDate, weekRange.endDate]);
 
@@ -79,6 +83,39 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     }
   }
 
+  async function loadMergedReports() {
+    const requestId = latestMergedReportsRequestId.current + 1;
+    latestMergedReportsRequestId.current = requestId;
+    setIsLoading(true);
+    setMessage('');
+    setSavedMergedReports([]);
+
+    try {
+      const query = new URLSearchParams({
+        reportStartDate: weekRange.startDate,
+        reportEndDate: weekRange.endDate,
+        mergeType: 'ADMIN',
+      });
+      const data = await requestApi(`/api/merged-reports?${query.toString()}`, {
+        method: 'GET',
+        token,
+      });
+      if (requestId !== latestMergedReportsRequestId.current) {
+        return;
+      }
+      setSavedMergedReports(data);
+    } catch (error) {
+      if (requestId === latestMergedReportsRequestId.current) {
+        setSavedMergedReports([]);
+        setMessage(error.message);
+      }
+    } finally {
+      if (requestId === latestMergedReportsRequestId.current) {
+        setIsLoading(false);
+      }
+    }
+  }
+
   function handleSearch(event) {
     event.preventDefault();
     loadSubmittedItems();
@@ -107,12 +144,17 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       return;
     }
 
+    setMergedReportId(null);
     setMergedText(automaticPreview);
     setMessage('선택한 항목을 단위업무별로 병합했습니다.');
   }
 
   async function saveMergedReport() {
-    if (selectedIds.length === 0 || !mergedText?.trim()) {
+    if (!mergedReportId && selectedIds.length === 0) {
+      setMessage('저장할 취합 항목을 선택해 주세요.');
+      return;
+    }
+    if (!mergedText?.trim()) {
       setMessage('저장할 병합 결과를 먼저 생성해 주세요.');
       return;
     }
@@ -133,12 +175,20 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       const data = await requestApi(path, { method, body, token });
       setMergedText(data.mergedText);
       setMergedReportId(data.id);
+      await loadMergedReports();
       setMessage(mergedReportId ? '취합 결과를 수정 저장했습니다.' : '취합 결과를 저장했습니다.');
     } catch (error) {
       setMessage(error.message);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function loadSavedMergedReport(report) {
+    setMergedReportId(report.id);
+    setMergedText(report.mergedText);
+    setSelectedIds([]);
+    setMessage('저장된 취합 결과를 불러왔습니다.');
   }
 
   async function copyMergedText() {
@@ -287,6 +337,9 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
             <button className="secondary-button" type="button" onClick={mergeSelectedItems} disabled={selectedIds.length === 0}>
               병합
             </button>
+            <button className="secondary-button" type="button" onClick={loadMergedReports} disabled={isLoading}>
+              목록 새로고침
+            </button>
             <button className="secondary-button" type="button" onClick={saveMergedReport} disabled={!mergedText?.trim() || isLoading}>
               {mergedReportId ? '수정 저장' : '저장'}
             </button>
@@ -294,6 +347,22 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
               복사
             </button>
           </div>
+        </div>
+        <div className="saved-report-list" aria-label="저장된 취합 결과 목록">
+          {savedMergedReports.length === 0 ? (
+            <p className="empty-list">저장된 취합 결과가 없습니다.</p>
+          ) : savedMergedReports.map((report) => (
+            <button
+              key={report.id}
+              className={`saved-report-button${mergedReportId === report.id ? ' active' : ''}`}
+              type="button"
+              onClick={() => loadSavedMergedReport(report)}
+            >
+              <strong>{report.status}</strong>
+              <span>{formatDate(report.updatedAt.slice(0, 10))}</span>
+              <span>{report.mergedText.slice(0, 60)}</span>
+            </button>
+          ))}
         </div>
         <textarea
           className="preview-editor"

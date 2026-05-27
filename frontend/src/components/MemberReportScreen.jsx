@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels } from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
 import { buildPreview } from '../reportPreview';
@@ -7,22 +7,28 @@ import { parseReportCsvBuffer } from '../csvReportImport';
 
 function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }) {
   const today = useMemo(() => toDateInputValue(new Date()), []);
+  const latestMergedReportsRequestId = useRef(0);
   const [baseDate, setBaseDate] = useState(today);
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [reportForm, setReportForm] = useState(initialReportForm);
   const [mergedReportId, setMergedReportId] = useState(null);
+  const [mergedText, setMergedText] = useState(null);
+  const [savedMergedReports, setSavedMergedReports] = useState([]);
   const [csvRows, setCsvRows] = useState([]);
   const [csvFileName, setCsvFileName] = useState('');
   const [csvSaveResults, setCsvSaveResults] = useState([]);
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
+  const activeMergedText = mergedText ?? previewText;
   const isPendingManager = user.requestedRole === 'MANAGER' && user.roleApprovalStatus === 'PENDING';
 
   useEffect(() => {
     if (token) {
+      setSavedMergedReports([]);
       loadReportItems();
+      loadMergedReports();
     }
   }, [token, weekRange.startDate, weekRange.endDate]);
 
@@ -219,10 +225,42 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       setItems(data);
       setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id && item.saveStatus === 'SAVED')));
       setMergedReportId(null);
+      setMergedText(null);
     } catch (error) {
       setMessage(error.message);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadMergedReports() {
+    const requestId = latestMergedReportsRequestId.current + 1;
+    latestMergedReportsRequestId.current = requestId;
+    setIsLoading(true);
+    setSavedMergedReports([]);
+    try {
+      const query = new URLSearchParams({
+        reportStartDate: weekRange.startDate,
+        reportEndDate: weekRange.endDate,
+        mergeType: 'MEMBER',
+      });
+      const data = await requestApi(`/api/merged-reports?${query.toString()}`, {
+        method: 'GET',
+        token,
+      });
+      if (requestId !== latestMergedReportsRequestId.current) {
+        return;
+      }
+      setSavedMergedReports(data);
+    } catch (error) {
+      if (requestId === latestMergedReportsRequestId.current) {
+        setSavedMergedReports([]);
+        setMessage(error.message);
+      }
+    } finally {
+      if (requestId === latestMergedReportsRequestId.current) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -317,11 +355,23 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
     ));
     setMergedReportId(null);
+    setMergedText(null);
+  }
+
+  function loadSavedMergedReport(report) {
+    setMergedReportId(report.id);
+    setMergedText(report.mergedText);
+    setSelectedIds([]);
+    setMessage('저장된 병합 결과를 불러왔습니다.');
   }
 
   async function saveMergedReport() {
-    if (selectedIds.length === 0) {
+    if (!mergedReportId && selectedIds.length === 0) {
       setMessage('저장할 병합 항목을 선택해 주세요.');
+      return;
+    }
+    if (!activeMergedText.trim()) {
+      setMessage('저장할 병합 텍스트가 없습니다.');
       return;
     }
 
@@ -333,13 +383,15 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         mergeType: 'MEMBER',
         reportStartDate: weekRange.startDate,
         reportEndDate: weekRange.endDate,
-        mergedText: previewText,
+        mergedText: activeMergedText,
         status: 'SAVED',
       };
       const path = mergedReportId ? `/api/merged-reports/${mergedReportId}` : '/api/merged-reports';
       const method = mergedReportId ? 'PUT' : 'POST';
       const data = await requestApi(path, { method, body, token });
       setMergedReportId(data.id);
+      setMergedText(data.mergedText);
+      await loadMergedReports();
       setMessage(mergedReportId ? '병합 결과를 수정 저장했습니다.' : '병합 결과를 저장했습니다.');
     } catch (error) {
       setMessage(error.message);
@@ -349,13 +401,17 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   }
 
   async function copyPreview() {
-    if (selectedIds.length === 0) {
-      setMessage('복사할 항목을 선택해 주세요.');
+    if (!mergedReportId && selectedIds.length === 0) {
+      setMessage('복사할 항목을 선택하거나 저장된 병합 결과를 불러와 주세요.');
+      return;
+    }
+    if (!activeMergedText.trim()) {
+      setMessage('복사할 병합 텍스트가 없습니다.');
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(previewText);
+      await navigator.clipboard.writeText(activeMergedText);
       setMessage('미리보기 텍스트를 복사했습니다.');
     } catch (error) {
       setMessage('브라우저에서 클립보드 복사를 허용하지 않았습니다.');
@@ -475,7 +531,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
           )}
 
           {csvSaveResults.length > 0 && (
-            <div className="csv-result-list" role="status" aria-live="polite" aria-label="CSV save results">
+            <div className="csv-result-list" role="status" aria-live="polite" aria-label="CSV 저장 결과">
               {csvSaveResults.map((result) => (
                 <p key={result.key} className={`csv-result ${result.status}`}>
                   <span>{result.status === 'success' ? '성공' : '실패'}</span>
@@ -655,15 +711,39 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <h2>단위업무별 병합 결과</h2>
           </div>
           <div className="button-row compact-actions">
-            <button className="secondary-button" type="button" onClick={saveMergedReport} disabled={selectedIds.length === 0 || isLoading}>
+            <button className="secondary-button" type="button" onClick={loadMergedReports} disabled={isLoading}>
+              목록 새로고침
+            </button>
+            <button className="secondary-button" type="button" onClick={saveMergedReport} disabled={(!mergedReportId && selectedIds.length === 0) || !activeMergedText.trim() || isLoading}>
               {mergedReportId ? '수정 저장' : '저장'}
             </button>
-            <button className="primary-button compact" type="button" onClick={copyPreview} disabled={selectedIds.length === 0}>
+            <button className="primary-button compact" type="button" onClick={copyPreview} disabled={(!mergedReportId && selectedIds.length === 0) || !activeMergedText.trim()}>
               복사
             </button>
           </div>
         </div>
-        <pre>{previewText}</pre>
+        <div className="saved-report-list" aria-label="저장된 병합 결과 목록">
+          {savedMergedReports.length === 0 ? (
+            <p className="empty-list">저장된 병합 결과가 없습니다.</p>
+          ) : savedMergedReports.map((report) => (
+            <button
+              key={report.id}
+              className={`saved-report-button${mergedReportId === report.id ? ' active' : ''}`}
+              type="button"
+              onClick={() => loadSavedMergedReport(report)}
+            >
+              <strong>{report.status}</strong>
+              <span>{formatDate(report.updatedAt.slice(0, 10))}</span>
+              <span>{report.mergedText.slice(0, 60)}</span>
+            </button>
+          ))}
+        </div>
+        <textarea
+          className="preview-editor"
+          value={activeMergedText}
+          onChange={(event) => setMergedText(event.target.value)}
+          aria-label="팀원 병합 결과 텍스트"
+        />
       </section>
     </div>
   );

@@ -20,4 +20,3 @@ export function getWeekRange(dateValue) {
 export function formatDate(dateValue) {
   return dateValue.replaceAll('-', '.');
 }
-
