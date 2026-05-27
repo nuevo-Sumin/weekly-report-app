@@ -1,4 +1,5 @@
 const headerAliases = {
+  sourceKey: ['#', 'ID', '아이디'],
   unitTask: ['범주', '단위업무'],
   title: ['제목', '세부사항'],
   progressContent: ['진행내용'],
@@ -20,6 +21,8 @@ function findHeaderIndex(headers, aliases) {
 
 function parseCsv(text) {
   const rows = [];
+  let rowStartLine = 1;
+  let lineNumber = 1;
   let row = [];
   let field = '';
   let inQuotes = false;
@@ -36,6 +39,9 @@ function parseCsv(text) {
         inQuotes = false;
       } else {
         field += current;
+        if (current === '\n') {
+          lineNumber += 1;
+        }
       }
       continue;
     }
@@ -48,13 +54,15 @@ function parseCsv(text) {
     } else if (current === '\n' || current === '\r') {
       if (field || row.length > 0) {
         row.push(field.trim());
-        rows.push(row);
+        rows.push({ values: row, lineNumber: rowStartLine });
         row = [];
         field = '';
       }
       if (current === '\r' && next === '\n') {
         index += 1;
       }
+      lineNumber += 1;
+      rowStartLine = lineNumber;
     } else {
       field += current;
     }
@@ -66,10 +74,10 @@ function parseCsv(text) {
 
   if (field || row.length > 0) {
     row.push(field.trim());
-    rows.push(row);
+    rows.push({ values: row, lineNumber: rowStartLine });
   }
 
-  return rows.filter((candidate) => candidate.some((value) => value !== ''));
+  return rows.filter((candidate) => candidate.values.some((value) => value !== ''));
 }
 
 function parseStatus(rawStatus, progressRate, rowNumber) {
@@ -134,17 +142,17 @@ export function parseReportCsv(text) {
     throw new Error('CSV에 가져올 데이터가 없습니다.');
   }
 
-  const headers = rows[0].map(normalizeHeader);
+  const headers = rows[0].values.map(normalizeHeader);
   const indexes = Object.fromEntries(
     Object.entries(headerAliases).map(([field, aliases]) => [field, findHeaderIndex(headers, aliases)])
   );
 
-  if (indexes.title === -1 || indexes.status === -1) {
-    throw new Error('CSV 헤더에 제목/상태 컬럼이 필요합니다.');
+  if (indexes.sourceKey === -1 || indexes.title === -1 || indexes.status === -1) {
+    throw new Error('CSV 헤더에 #/제목/상태 컬럼이 필요합니다.');
   }
 
-  return rows.slice(1).map((row, index) => {
-    const rowNumber = index + 2;
+  return rows.slice(1).map(({ values: row, lineNumber }) => {
+    const rowNumber = lineNumber;
     const title = row[indexes.title]?.trim();
     if (!title) {
       throw new Error(`${rowNumber}행의 제목이 비어 있습니다.`);
@@ -152,11 +160,18 @@ export function parseReportCsv(text) {
 
     const progressRate = parseProgressRate(row[indexes.progressRate], rowNumber);
     const status = parseStatus(row[indexes.status], progressRate, rowNumber);
+    const csvId = row[indexes.sourceKey]?.trim();
+    if (!csvId) {
+      throw new Error(`${rowNumber}행의 # 값이 비어 있습니다.`);
+    }
+    const sourceKey = csvId;
 
     return {
       tempId: `csv-${rowNumber}-${title}`,
       selected: true,
       weekSelection: 'THIS_WEEK',
+      sourceKey,
+      sourceRowNumber: rowNumber,
       unitTask: indexes.unitTask >= 0 ? (row[indexes.unitTask]?.trim() || '미분류') : '미분류',
       title,
       detailContent: title,

@@ -13,6 +13,7 @@ import com.metabuild.weeklyreport.auth.dto.SignupRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemSubmitRequest;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
 import java.time.LocalDate;
@@ -94,6 +95,118 @@ class WeeklyReportItemIntegrationTest {
     }
 
     @Test
+    void csvSourceKeyCannotBeSavedTwiceForSamePeriodAndWeekType() throws Exception {
+        String token = signupAndLogin("csvduplicate");
+        ReportItemRequest request = csvReportItemRequest(WeekType.THIS_WEEK, "123");
+
+        mockMvc.perform(post("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sourceType").value("CSV"))
+                .andExpect(jsonPath("$.data.sourceKey").value("123"))
+                .andExpect(jsonPath("$.data.sourceRowNumber").value(2));
+
+        mockMvc.perform(post("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+
+        mockMvc.perform(post("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(csvReportItemRequest(WeekType.NEXT_WEEK, "123"))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void csvSourceKeyIsScopedPerUserAndCannotBeChangedOnUpdate() throws Exception {
+        String ownerToken = signupAndLogin("csvowner");
+        String otherToken = signupAndLogin("csvother");
+        Long itemId = createCsvItem(ownerToken, WeekType.THIS_WEEK, "shared-key");
+
+        mockMvc.perform(post("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(csvReportItemRequest(WeekType.THIS_WEEK, "shared-key"))))
+                .andExpect(status().isCreated());
+
+        ReportItemRequest manualUpdateRequest = new ReportItemRequest(
+                LocalDate.of(2026, 5, 25),
+                LocalDate.of(2026, 5, 31),
+                WeekType.THIS_WEEK,
+                "수정된 업무",
+                "수정된 CSV 항목",
+                "수정된 CSV 항목",
+                "수정된 진행 내용",
+                ReportItemStatus.IN_PROGRESS,
+                75,
+                LocalDate.of(2026, 5, 30),
+                false,
+                ReportItemSourceType.MANUAL,
+                "changed-key",
+                99,
+                SaveStatus.SAVED
+        );
+
+        mockMvc.perform(put("/api/report-items/{itemId}", itemId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualUpdateRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sourceType").value("CSV"))
+                .andExpect(jsonPath("$.data.sourceKey").value("shared-key"))
+                .andExpect(jsonPath("$.data.sourceRowNumber").value(2));
+
+        mockMvc.perform(post("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(csvReportItemRequest(WeekType.THIS_WEEK, "shared-key"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void csvSourceKeyIsRequiredAndManualItemsClearSourceMetadata() throws Exception {
+        String token = signupAndLogin("csvvalidation");
+
+        mockMvc.perform(post("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(csvReportItemRequest(WeekType.THIS_WEEK, " "))))
+                .andExpect(status().isBadRequest());
+
+        ReportItemRequest manualRequest = new ReportItemRequest(
+                LocalDate.of(2026, 5, 25),
+                LocalDate.of(2026, 5, 31),
+                WeekType.THIS_WEEK,
+                "수동 업무",
+                "수동 항목",
+                "수동 항목 상세",
+                "수동 진행 내용",
+                ReportItemStatus.IN_PROGRESS,
+                50,
+                null,
+                false,
+                ReportItemSourceType.MANUAL,
+                "ignored",
+                5,
+                SaveStatus.SAVED
+        );
+
+        mockMvc.perform(post("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sourceType").value("MANUAL"))
+                .andExpect(jsonPath("$.data.sourceKey").doesNotExist())
+                .andExpect(jsonPath("$.data.sourceRowNumber").doesNotExist());
+    }
+
+    @Test
     void submittedItemsCannotBeEditedOrSubmittedAgain() throws Exception {
         String token = signupAndLogin("submittedguard");
         Long itemId = createItem(token, "제출 보호", SaveStatus.SAVED);
@@ -156,6 +269,18 @@ class WeeklyReportItemIntegrationTest {
         return response.path("data").path("id").asLong();
     }
 
+    private Long createCsvItem(String token, WeekType weekType, String sourceKey) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(csvReportItemRequest(weekType, sourceKey))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+        return response.path("data").path("id").asLong();
+    }
+
     private ReportItemRequest reportItemRequest(String unitTask, SaveStatus saveStatus) {
         return new ReportItemRequest(
                 LocalDate.of(2026, 5, 25),
@@ -169,7 +294,30 @@ class WeeklyReportItemIntegrationTest {
                 60,
                 LocalDate.of(2026, 5, 29),
                 false,
+                null,
+                null,
+                null,
                 saveStatus
+        );
+    }
+
+    private ReportItemRequest csvReportItemRequest(WeekType weekType, String sourceKey) {
+        return new ReportItemRequest(
+                LocalDate.of(2026, 5, 25),
+                LocalDate.of(2026, 5, 31),
+                weekType,
+                "주간보고 API",
+                "CSV 항목",
+                "CSV 항목",
+                "CSV 업로드 항목",
+                ReportItemStatus.IN_PROGRESS,
+                60,
+                LocalDate.of(2026, 5, 29),
+                false,
+                ReportItemSourceType.CSV,
+                sourceKey,
+                2,
+                SaveStatus.SAVED
         );
     }
 

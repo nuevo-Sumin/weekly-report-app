@@ -40,7 +40,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation() {
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        String message = ex.getMostSpecificCause().getMessage();
+        if (message != null && message.contains("UK_REPORT_ITEM_CSV_SOURCE")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiResponse.error("CSV row has already been saved for this report period and week type."));
+        }
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error("Login id or email already exists."));
     }

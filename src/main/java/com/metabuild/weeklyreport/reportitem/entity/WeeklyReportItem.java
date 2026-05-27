@@ -14,11 +14,25 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "weekly_report_items")
+@Table(
+        name = "weekly_report_items",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_report_item_csv_source",
+                columnNames = {
+                        "author_id",
+                        "report_start_date",
+                        "report_end_date",
+                        "week_type",
+                        "source_type",
+                        "source_key"
+                }
+        )
+)
 public class WeeklyReportItem {
 
     @Id
@@ -64,6 +78,15 @@ public class WeeklyReportItem {
     private boolean completed;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ReportItemSourceType sourceType;
+
+    @Column(length = 120)
+    private String sourceKey;
+
+    private Integer sourceRowNumber;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private SaveStatus saveStatus;
 
@@ -91,6 +114,9 @@ public class WeeklyReportItem {
             int progressRate,
             LocalDate dueDate,
             boolean completed,
+            ReportItemSourceType sourceType,
+            String sourceKey,
+            Integer sourceRowNumber,
             SaveStatus saveStatus
     ) {
         this.author = author;
@@ -105,6 +131,9 @@ public class WeeklyReportItem {
         this.progressRate = progressRate;
         this.dueDate = dueDate;
         this.completed = completed;
+        this.sourceType = sourceType;
+        this.sourceKey = sourceKey;
+        this.sourceRowNumber = sourceRowNumber;
         this.saveStatus = saveStatus;
     }
 
@@ -120,6 +149,9 @@ public class WeeklyReportItem {
             int progressRate,
             LocalDate dueDate,
             boolean completed,
+            ReportItemSourceType sourceType,
+            String sourceKey,
+            Integer sourceRowNumber,
             SaveStatus saveStatus
     ) {
         this.reportStartDate = reportStartDate;
@@ -133,6 +165,9 @@ public class WeeklyReportItem {
         this.progressRate = progressRate;
         this.dueDate = dueDate;
         this.completed = completed;
+        this.sourceType = sourceType;
+        this.sourceKey = sourceKey;
+        this.sourceRowNumber = sourceRowNumber;
         this.saveStatus = saveStatus;
         if (saveStatus != SaveStatus.SUBMITTED) {
             this.submittedAt = null;
@@ -150,6 +185,9 @@ public class WeeklyReportItem {
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();
+        if (this.sourceType == null) {
+            this.sourceType = ReportItemSourceType.MANUAL;
+        }
         this.createdAt = now;
         this.updatedAt = now;
     }
@@ -209,6 +247,18 @@ public class WeeklyReportItem {
 
     public boolean isCompleted() {
         return completed;
+    }
+
+    public ReportItemSourceType getSourceType() {
+        return sourceType;
+    }
+
+    public String getSourceKey() {
+        return sourceKey;
+    }
+
+    public Integer getSourceRowNumber() {
+        return sourceRowNumber;
     }
 
     public SaveStatus getSaveStatus() {

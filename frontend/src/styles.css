@@ -409,6 +409,35 @@ textarea:focus {
   min-height: 42px;
 }
 
+.csv-result-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.csv-result {
+  display: grid;
+  grid-template-columns: minmax(58px, auto) minmax(0, 1fr) minmax(160px, 1.2fr);
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #d5e4d7;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #274c34;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.csv-result.success {
+  border-color: #9ac8a3;
+}
+
+.csv-result.error {
+  border-color: #d9a2a2;
+  color: #7a2f2f;
+}
+
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -597,7 +626,8 @@ textarea:focus {
   .button-row,
   .email-field-row,
   .csv-upload-actions,
-  .csv-table-summary {
+  .csv-table-summary,
+  .csv-result {
     align-items: flex-start;
     grid-template-columns: 1fr;
     flex-direction: column;

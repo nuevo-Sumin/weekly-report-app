@@ -1,6 +1,7 @@
 package com.metabuild.weeklyreport.reportitem.dto;
 
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
 import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
@@ -22,6 +23,9 @@ public record ReportItemResponse(
         int progressRate,
         LocalDate dueDate,
         boolean completed,
+        ReportItemSourceType sourceType,
+        String sourceKey,
+        Integer sourceRowNumber,
         SaveStatus saveStatus,
         LocalDateTime submittedAt,
         LocalDateTime createdAt,
@@ -44,6 +48,9 @@ public record ReportItemResponse(
                 item.getProgressRate(),
                 item.getDueDate(),
                 item.isCompleted(),
+                item.getSourceType() == null ? ReportItemSourceType.MANUAL : item.getSourceType(),
+                item.getSourceKey(),
+                item.getSourceRowNumber(),
                 item.getSaveStatus(),
                 item.getSubmittedAt(),
                 item.getCreatedAt(),

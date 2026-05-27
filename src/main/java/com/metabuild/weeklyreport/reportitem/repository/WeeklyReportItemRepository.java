@@ -1,6 +1,7 @@
 package com.metabuild.weeklyreport.reportitem.repository;
 
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
 import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
 import com.metabuild.weeklyreport.user.entity.User;
@@ -30,6 +31,25 @@ public interface WeeklyReportItemRepository extends JpaRepository<WeeklyReportIt
     List<WeeklyReportItem> findByAuthorAndIdIn(User author, Collection<Long> ids);
 
     Optional<WeeklyReportItem> findByAuthorAndId(User author, Long id);
+
+    boolean existsByAuthorAndReportStartDateAndReportEndDateAndWeekTypeAndSourceTypeAndSourceKey(
+            User author,
+            LocalDate reportStartDate,
+            LocalDate reportEndDate,
+            WeekType weekType,
+            ReportItemSourceType sourceType,
+            String sourceKey
+    );
+
+    boolean existsByAuthorAndReportStartDateAndReportEndDateAndWeekTypeAndSourceTypeAndSourceKeyAndIdNot(
+            User author,
+            LocalDate reportStartDate,
+            LocalDate reportEndDate,
+            WeekType weekType,
+            ReportItemSourceType sourceType,
+            String sourceKey,
+            Long id
+    );
 
     @Query("""
             select item

@@ -14,6 +14,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [mergedReportId, setMergedReportId] = useState(null);
   const [csvRows, setCsvRows] = useState([]);
   const [csvFileName, setCsvFileName] = useState('');
+  const [csvSaveResults, setCsvSaveResults] = useState([]);
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
@@ -35,6 +36,11 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     )));
   }
 
+  function getPendingWeekTypes(row) {
+    const selectedWeekTypes = row.weekSelection === 'ALL' ? ['THIS_WEEK', 'NEXT_WEEK'] : [row.weekSelection];
+    return selectedWeekTypes.filter((weekType) => !row.savedWeekTypes?.includes(weekType));
+  }
+
   function handleCsvFileChange(event) {
     const [file] = event.target.files;
     if (!file) {
@@ -52,10 +58,12 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         const rows = parseReportCsvBuffer(reader.result);
         setCsvRows(rows);
         setCsvFileName(file.name);
+        setCsvSaveResults([]);
         setMessage(`${rows.length}개 CSV 행을 불러왔습니다. 행별 주차 구분을 확인해 주세요.`);
       } catch (error) {
         setCsvRows([]);
         setCsvFileName('');
+        setCsvSaveResults([]);
         setMessage(error.message);
       } finally {
         event.target.value = '';
@@ -80,34 +88,89 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
 
     try {
       let createdCount = 0;
+      let failedCount = 0;
+      const results = [];
+      const savedWeekTypesByRow = {};
       for (const row of rowsToSave) {
-        const weekTypes = row.weekSelection === 'ALL' ? ['THIS_WEEK', 'NEXT_WEEK'] : [row.weekSelection];
-        for (const weekType of weekTypes) {
-          await requestApi('/api/report-items', {
-            body: {
-              reportStartDate: weekRange.startDate,
-              reportEndDate: weekRange.endDate,
-              weekType,
-              unitTask: row.unitTask,
-              title: row.title,
-              detailContent: row.title,
-              progressContent: row.progressContent,
-              status: row.completed ? 'DONE' : row.status,
-              progressRate: row.progressRate,
-              dueDate: row.dueDate || null,
-              completed: row.completed,
-              saveStatus: 'SAVED',
-            },
-            token,
+        const weekTypes = getPendingWeekTypes(row);
+        if (weekTypes.length === 0) {
+          results.push({
+            key: `${row.tempId}-skipped`,
+            status: 'success',
+            title: row.title,
+            sourceKey: row.sourceKey,
+            sourceRowNumber: row.sourceRowNumber,
+            weekType: row.weekSelection === 'ALL' ? 'THIS_WEEK' : row.weekSelection,
+            message: '이미 저장됨',
           });
-          createdCount += 1;
+          continue;
+        }
+        for (const weekType of weekTypes) {
+          try {
+            await requestApi('/api/report-items', {
+              body: {
+                reportStartDate: weekRange.startDate,
+                reportEndDate: weekRange.endDate,
+                weekType,
+                unitTask: row.unitTask,
+                title: row.title,
+                detailContent: row.title,
+                progressContent: row.progressContent,
+                status: row.completed ? 'DONE' : row.status,
+                progressRate: row.progressRate,
+                dueDate: row.dueDate || null,
+                completed: row.completed,
+                sourceType: 'CSV',
+                sourceKey: row.sourceKey,
+                sourceRowNumber: row.sourceRowNumber,
+                saveStatus: 'SAVED',
+              },
+              token,
+            });
+            createdCount += 1;
+            savedWeekTypesByRow[row.tempId] = [...(savedWeekTypesByRow[row.tempId] ?? []), weekType];
+            results.push({
+              key: `${row.tempId}-${weekType}`,
+              status: 'success',
+              title: row.title,
+              sourceKey: row.sourceKey,
+              sourceRowNumber: row.sourceRowNumber,
+              weekType,
+              message: '저장됨',
+            });
+          } catch (error) {
+            failedCount += 1;
+            results.push({
+              key: `${row.tempId}-${weekType}`,
+              status: 'error',
+              title: row.title,
+              sourceKey: row.sourceKey,
+              sourceRowNumber: row.sourceRowNumber,
+              weekType,
+              message: error.message,
+            });
+          }
         }
       }
 
-      setCsvRows([]);
-      setCsvFileName('');
-      setMessage(`CSV에서 ${createdCount}개 업무 항목을 저장했습니다.`);
-      await loadReportItems();
+      setCsvSaveResults(results);
+      if (failedCount === 0) {
+        setCsvRows([]);
+        setCsvFileName('');
+      } else {
+        setCsvRows((current) => current.map((row) => (
+          savedWeekTypesByRow[row.tempId]
+            ? {
+                ...row,
+                savedWeekTypes: [...new Set([...(row.savedWeekTypes ?? []), ...savedWeekTypesByRow[row.tempId]])],
+              }
+            : row
+        )));
+      }
+      setMessage(`CSV 저장 결과: 성공 ${createdCount}건, 실패 ${failedCount}건`);
+      if (createdCount > 0) {
+        await loadReportItems();
+      }
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -313,12 +376,21 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               CSV 업로드
               <input type="file" accept=".csv,text/csv" onChange={handleCsvFileChange} disabled={isLoading} />
             </label>
-            <button className="secondary-button" type="button" onClick={() => setCsvRows([])} disabled={csvRows.length === 0 || isLoading}>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => {
+                setCsvRows([]);
+                setCsvFileName('');
+                setCsvSaveResults([]);
+              }}
+              disabled={csvRows.length === 0 || isLoading}
+            >
               업로드 행 지우기
             </button>
           </div>
           <p className="helper-text">
-            CSV 양식은 원본 PMS 파일의 제목, 상태, 범주, 진척도 컬럼을 사용합니다. 주차 구분은 업로드 후 행별로 선택합니다.
+            CSV 양식은 원본 PMS 파일의 #, 제목, 상태, 범주, 진척도 컬럼을 사용합니다. 주차 구분은 업로드 후 행별로 선택합니다.
           </p>
 
           {csvRows.length > 0 && (
@@ -372,6 +444,18 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {csvSaveResults.length > 0 && (
+            <div className="csv-result-list" aria-label="CSV 저장 결과">
+              {csvSaveResults.map((result) => (
+                <p key={result.key} className={`csv-result ${result.status}`}>
+                  <strong>{weekTypeLabels[result.weekType]}</strong>
+                  <span>#{result.sourceKey} / {result.sourceRowNumber}행 / {result.title}</span>
+                  <span>{result.message}</span>
+                </p>
+              ))}
             </div>
           )}
         </div>

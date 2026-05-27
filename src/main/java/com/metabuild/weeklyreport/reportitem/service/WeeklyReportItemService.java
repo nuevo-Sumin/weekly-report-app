@@ -4,6 +4,7 @@ import com.metabuild.weeklyreport.reportitem.dto.AdminReportItemResponse;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemResponse;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemSubmitRequest;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
@@ -38,6 +39,9 @@ public class WeeklyReportItemService {
     public ReportItemResponse create(String loginId, ReportItemRequest request) {
         User author = getUser(loginId);
         SaveStatus saveStatus = normalizeWritableSaveStatus(request.saveStatus());
+        ReportItemSourceType sourceType = normalizeSourceType(request.sourceType());
+        String sourceKey = normalizeSourceKey(sourceType, request.sourceKey());
+        validateDuplicateSource(author, request, sourceType, sourceKey, null);
 
         WeeklyReportItem item = new WeeklyReportItem(
                 author,
@@ -52,6 +56,9 @@ public class WeeklyReportItemService {
                 request.progressRate(),
                 request.dueDate(),
                 request.completed(),
+                sourceType,
+                sourceKey,
+                normalizeSourceRowNumber(sourceType, request.sourceRowNumber()),
                 saveStatus
         );
 
@@ -91,6 +98,10 @@ public class WeeklyReportItemService {
         if (item.getSaveStatus() == SaveStatus.SUBMITTED) {
             throw new IllegalArgumentException("Submitted report items cannot be edited.");
         }
+        ReportItemSourceType sourceType = normalizeSourceType(item.getSourceType());
+        String sourceKey = item.getSourceKey();
+        Integer sourceRowNumber = item.getSourceRowNumber();
+        validateDuplicateSource(item.getAuthor(), request, sourceType, sourceKey, item.getId());
         item.update(
                 request.reportStartDate(),
                 request.reportEndDate(),
@@ -103,6 +114,9 @@ public class WeeklyReportItemService {
                 request.progressRate(),
                 request.dueDate(),
                 request.completed(),
+                sourceType,
+                sourceKey,
+                sourceRowNumber,
                 normalizeWritableSaveStatus(request.saveStatus())
         );
         return ReportItemResponse.from(item);
@@ -172,6 +186,56 @@ public class WeeklyReportItemService {
             throw new IllegalArgumentException("Use submit API to submit report items.");
         }
         return saveStatus;
+    }
+
+    private ReportItemSourceType normalizeSourceType(ReportItemSourceType sourceType) {
+        return sourceType == null ? ReportItemSourceType.MANUAL : sourceType;
+    }
+
+    private String normalizeSourceKey(ReportItemSourceType sourceType, String sourceKey) {
+        if (sourceType != ReportItemSourceType.CSV) {
+            return null;
+        }
+        return trim(sourceKey);
+    }
+
+    private Integer normalizeSourceRowNumber(ReportItemSourceType sourceType, Integer sourceRowNumber) {
+        return sourceType == ReportItemSourceType.CSV ? sourceRowNumber : null;
+    }
+
+    private void validateDuplicateSource(
+            User author,
+            ReportItemRequest request,
+            ReportItemSourceType sourceType,
+            String sourceKey,
+            Long currentItemId
+    ) {
+        if (sourceType != ReportItemSourceType.CSV) {
+            return;
+        }
+
+        boolean exists = currentItemId == null
+                ? reportItemRepository.existsByAuthorAndReportStartDateAndReportEndDateAndWeekTypeAndSourceTypeAndSourceKey(
+                        author,
+                        request.reportStartDate(),
+                        request.reportEndDate(),
+                        request.weekType(),
+                        sourceType,
+                        sourceKey
+                )
+                : reportItemRepository.existsByAuthorAndReportStartDateAndReportEndDateAndWeekTypeAndSourceTypeAndSourceKeyAndIdNot(
+                        author,
+                        request.reportStartDate(),
+                        request.reportEndDate(),
+                        request.weekType(),
+                        sourceType,
+                        sourceKey,
+                        currentItemId
+                );
+
+        if (exists) {
+            throw new IllegalArgumentException("CSV row has already been saved for this report period and week type.");
+        }
     }
 
     private String trim(String value) {

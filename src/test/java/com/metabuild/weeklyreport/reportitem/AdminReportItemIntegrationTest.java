@@ -167,6 +167,9 @@ class AdminReportItemIntegrationTest {
                 70,
                 LocalDate.of(2026, 6, 5),
                 false,
+                null,
+                null,
+                null,
                 saveStatus
         );
     }

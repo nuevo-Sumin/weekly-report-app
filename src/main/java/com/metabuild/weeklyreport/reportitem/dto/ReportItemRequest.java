@@ -1,6 +1,7 @@
 package com.metabuild.weeklyreport.reportitem.dto;
 
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
 import jakarta.validation.constraints.AssertTrue;
@@ -48,11 +49,24 @@ public record ReportItemRequest(
 
         boolean completed,
 
+        ReportItemSourceType sourceType,
+
+        @Size(max = 120)
+        String sourceKey,
+
+        @Min(1)
+        Integer sourceRowNumber,
+
         SaveStatus saveStatus
 ) {
 
     @AssertTrue(message = "reportEndDate must be on or after reportStartDate")
     public boolean isValidReportPeriod() {
         return reportStartDate == null || reportEndDate == null || !reportEndDate.isBefore(reportStartDate);
+    }
+
+    @AssertTrue(message = "sourceKey is required when sourceType is CSV")
+    public boolean isValidCsvSourceKey() {
+        return sourceType != ReportItemSourceType.CSV || (sourceKey != null && !sourceKey.isBlank());
     }
 }
