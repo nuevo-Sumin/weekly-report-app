@@ -3,7 +3,7 @@ import { csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
 import { buildPreview } from '../reportPreview';
 import { requestApi } from '../api';
-import { parseReportCsvBuffer } from '../csvReportImport';
+import { parseReportCsvBufferWithErrors } from '../csvReportImport';
 
 function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }) {
   const today = useMemo(() => toDateInputValue(new Date()), []);
@@ -17,6 +17,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [savedMergedReports, setSavedMergedReports] = useState([]);
   const [csvRows, setCsvRows] = useState([]);
   const [csvFileName, setCsvFileName] = useState('');
+  const [csvValidationResults, setCsvValidationResults] = useState([]);
   const [csvSaveResults, setCsvSaveResults] = useState([]);
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
@@ -71,17 +72,32 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const rows = parseReportCsvBuffer(reader.result);
+        const { rows, errors } = parseReportCsvBufferWithErrors(reader.result);
         setCsvRows(rows.map((row) => ({
           ...row,
           savedWeekTypes: getSavedCsvWeekTypes(row),
         })));
         setCsvFileName(file.name);
+        setCsvValidationResults(errors.map((error) => ({
+          key: `csv-parse-error-${error.lineNumber}`,
+          status: 'error',
+          title: 'CSV 검증 오류',
+          sourceKey: '-',
+          sourceRowNumber: error.lineNumber,
+          weekType: null,
+          message: error.message,
+        })));
         setCsvSaveResults([]);
-        setMessage(`${rows.length}개 CSV 행을 불러왔습니다. 행별 주차 구분을 확인해 주세요.`);
+        const errorNotice = errors.length > 0 ? ` 오류 ${errors.length}건은 제외했습니다.` : '';
+        if (rows.length === 0 && errors.length > 0) {
+          setMessage(`저장 가능한 CSV 행이 없습니다. 오류 ${errors.length}건을 확인해 주세요.`);
+          return;
+        }
+        setMessage(`${rows.length}개 CSV 행을 불러왔습니다.${errorNotice} 행별 주차 구분을 확인해 주세요.`);
       } catch (error) {
         setCsvRows([]);
         setCsvFileName('');
+        setCsvValidationResults([]);
         setCsvSaveResults([]);
         setMessage(error.message);
       } finally {
@@ -200,7 +216,8 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             : row
         )));
       }
-      setMessage(`CSV 저장 결과: 성공 ${createdCount}건, 실패 ${failedCount}건`);
+      const validationNotice = csvValidationResults.length > 0 ? `, 검증 제외 ${csvValidationResults.length}건` : '';
+      setMessage(`CSV 저장 결과: 성공 ${createdCount}건, 실패 ${failedCount}건${validationNotice}`);
       if (createdCount > 0) {
         await loadReportItems();
       }
@@ -466,9 +483,10 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               onClick={() => {
                 setCsvRows([]);
                 setCsvFileName('');
+                setCsvValidationResults([]);
                 setCsvSaveResults([]);
               }}
-              disabled={csvRows.length === 0 || isLoading}
+              disabled={(csvRows.length === 0 && csvValidationResults.length === 0 && csvSaveResults.length === 0) || isLoading}
             >
               업로드 행 지우기
             </button>
@@ -531,12 +549,25 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </div>
           )}
 
+          {csvValidationResults.length > 0 && (
+            <div className="csv-result-list" role="status" aria-live="polite" aria-label="CSV 검증 결과">
+              {csvValidationResults.map((result) => (
+                <p key={result.key} className={`csv-result ${result.status}`}>
+                  <span>검증 오류</span>
+                  <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
+                  <span>#{result.sourceKey} / {result.sourceRowNumber}행 / {result.title}</span>
+                  <span>{result.message}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
           {csvSaveResults.length > 0 && (
             <div className="csv-result-list" role="status" aria-live="polite" aria-label="CSV 저장 결과">
               {csvSaveResults.map((result) => (
                 <p key={result.key} className={`csv-result ${result.status}`}>
                   <span>{result.status === 'success' ? '성공' : '실패'}</span>
-                  <strong>{weekTypeLabels[result.weekType]}</strong>
+                  <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
                   <span>#{result.sourceKey} / {result.sourceRowNumber}행 / {result.title}</span>
                   <span>{result.message}</span>
                 </p>

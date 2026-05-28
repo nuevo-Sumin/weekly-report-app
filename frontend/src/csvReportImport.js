@@ -141,6 +141,14 @@ function parseDueDate(rawDueDate, rowNumber) {
 }
 
 export function parseReportCsv(text) {
+  const { rows, errors } = parseReportCsvWithErrors(text);
+  if (errors.length > 0) {
+    throw new Error(errors[0].message);
+  }
+  return rows;
+}
+
+export function parseReportCsvWithErrors(text) {
   const rows = parseCsv(text);
   if (rows.length < 2) {
     throw new Error('CSV에 가져올 데이터가 없습니다.');
@@ -155,40 +163,55 @@ export function parseReportCsv(text) {
     throw new Error('CSV 헤더에 #/제목/상태 컬럼이 필요합니다.');
   }
 
-  return rows.slice(1).map(({ values: row, lineNumber }) => {
+  return rows.slice(1).reduce((acc, { values: row, lineNumber }) => {
     const rowNumber = lineNumber;
-    const title = row[indexes.title]?.trim();
-    if (!title) {
-      throw new Error(`${rowNumber}행의 제목이 비어 있습니다.`);
-    }
+    try {
+      const title = row[indexes.title]?.trim();
+      if (!title) {
+        throw new Error(`${rowNumber}행의 제목이 비어 있습니다.`);
+      }
 
-    const progressRate = parseProgressRate(row[indexes.progressRate], rowNumber);
-    const status = parseStatus(row[indexes.status], progressRate, rowNumber);
-    const csvId = row[indexes.sourceKey]?.trim();
-    if (!csvId) {
-      throw new Error(`${rowNumber}행의 # 값이 비어 있습니다.`);
-    }
-    const sourceKey = csvId;
+      const progressRate = parseProgressRate(row[indexes.progressRate], rowNumber);
+      const status = parseStatus(row[indexes.status], progressRate, rowNumber);
+      const csvId = row[indexes.sourceKey]?.trim();
+      if (!csvId) {
+        throw new Error(`${rowNumber}행의 # 값이 비어 있습니다.`);
+      }
 
-    return {
-      tempId: `csv-${rowNumber}-${title}`,
-      selected: true,
-      weekSelection: 'THIS_WEEK',
-      sourceKey,
-      sourceRowNumber: rowNumber,
-      unitTask: indexes.unitTask >= 0 ? (row[indexes.unitTask]?.trim() || '미분류') : '미분류',
-      title,
-      detailContent: title,
-      progressContent: indexes.progressContent >= 0 ? (row[indexes.progressContent]?.trim() || title) : title,
-      status,
-      progressRate,
-      dueDate: indexes.dueDate >= 0 ? parseDueDate(row[indexes.dueDate], rowNumber) : '',
-      completed: parseCompleted(row[indexes.completed], status, progressRate),
-    };
-  });
+      acc.rows.push({
+        tempId: `csv-${rowNumber}-${title}`,
+        selected: true,
+        weekSelection: 'THIS_WEEK',
+        sourceKey: csvId,
+        sourceRowNumber: rowNumber,
+        unitTask: indexes.unitTask >= 0 ? (row[indexes.unitTask]?.trim() || '미분류') : '미분류',
+        title,
+        detailContent: title,
+        progressContent: indexes.progressContent >= 0 ? (row[indexes.progressContent]?.trim() || title) : title,
+        status,
+        progressRate,
+        dueDate: indexes.dueDate >= 0 ? parseDueDate(row[indexes.dueDate], rowNumber) : '',
+        completed: parseCompleted(row[indexes.completed], status, progressRate),
+      });
+    } catch (error) {
+      acc.errors.push({
+        lineNumber: rowNumber,
+        message: error.message,
+      });
+    }
+    return acc;
+  }, { rows: [], errors: [] });
 }
 
 export function parseReportCsvBuffer(buffer) {
+  return parseReportCsv(decodeCsvBuffer(buffer));
+}
+
+export function parseReportCsvBufferWithErrors(buffer) {
+  return parseReportCsvWithErrors(decodeCsvBuffer(buffer));
+}
+
+function decodeCsvBuffer(buffer) {
   let text;
 
   try {
@@ -197,5 +220,5 @@ export function parseReportCsvBuffer(buffer) {
     text = new TextDecoder('euc-kr').decode(buffer);
   }
 
-  return parseReportCsv(text.replace(/^\uFEFF/, ''));
+  return text.replace(/^\uFEFF/, '');
 }
