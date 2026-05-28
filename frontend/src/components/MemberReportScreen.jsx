@@ -19,11 +19,13 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [csvFileName, setCsvFileName] = useState('');
   const [csvValidationResults, setCsvValidationResults] = useState([]);
   const [csvSaveResults, setCsvSaveResults] = useState([]);
+  const [copySucceeded, setCopySucceeded] = useState(false);
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
   const activeMergedText = mergedText ?? previewText;
   const isPendingManager = user.requestedRole === 'MANAGER' && user.roleApprovalStatus === 'PENDING';
+  const savedItemCount = useMemo(() => items.filter((item) => item.saveStatus === 'SAVED').length, [items]);
 
   useEffect(() => {
     if (token) {
@@ -368,6 +370,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       setMessage('저장 상태의 항목만 제출 대상으로 선택할 수 있습니다.');
       return;
     }
+    setCopySucceeded(false);
     setSelectedIds((current) => (
       current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
     ));
@@ -379,6 +382,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setMergedReportId(report.id);
     setMergedText(report.mergedText);
     setSelectedIds(report.sourceItemIds ?? []);
+    setCopySucceeded(false);
     setMessage('저장된 병합 결과를 불러왔습니다.');
   }
 
@@ -409,6 +413,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       const data = await requestApi(path, { method, body, token });
       setMergedReportId(data.id);
       setMergedText(data.mergedText);
+      setCopySucceeded(false);
       await loadMergedReports();
       setMessage(mergedReportId ? '병합 결과를 수정 저장했습니다.' : '병합 결과를 저장했습니다.');
     } catch (error) {
@@ -430,6 +435,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
 
     try {
       await navigator.clipboard.writeText(activeMergedText);
+      setCopySucceeded(true);
       setMessage('미리보기 텍스트를 복사했습니다.');
     } catch (error) {
       setMessage('브라우저에서 클립보드 복사를 허용하지 않았습니다.');
@@ -679,9 +685,15 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <p className="panel-label">저장된 항목</p>
             <h2>제출 항목 선택</h2>
           </div>
-          <button className="primary-button compact" type="button" onClick={submitSelectedItems} disabled={isLoading}>
-            제출
-          </button>
+          <div className="section-actions">
+            <div className="summary-counts">
+              <span>저장 {savedItemCount}</span>
+              <strong>선택 {selectedIds.length}</strong>
+            </div>
+            <button className="primary-button compact" type="button" onClick={submitSelectedItems} disabled={selectedIds.length === 0 || isLoading}>
+              제출
+            </button>
+          </div>
         </div>
 
         <div className="items-table-wrap">
@@ -750,7 +762,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               {mergedReportId ? '수정 저장' : '저장'}
             </button>
             <button className="primary-button compact" type="button" onClick={copyPreview} disabled={(!mergedReportId && selectedIds.length === 0) || !activeMergedText.trim()}>
-              복사
+              {copySucceeded ? '복사됨' : '복사'}
             </button>
           </div>
         </div>
@@ -773,7 +785,10 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         <textarea
           className="preview-editor"
           value={activeMergedText}
-          onChange={(event) => setMergedText(event.target.value)}
+          onChange={(event) => {
+            setMergedText(event.target.value);
+            setCopySucceeded(false);
+          }}
           aria-label="팀원 병합 결과 텍스트"
         />
       </section>

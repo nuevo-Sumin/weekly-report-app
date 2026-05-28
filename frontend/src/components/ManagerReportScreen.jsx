@@ -21,6 +21,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   const [mergedText, setMergedText] = useState(null);
   const [mergedReportId, setMergedReportId] = useState(null);
   const [savedMergedReports, setSavedMergedReports] = useState([]);
+  const [copySucceeded, setCopySucceeded] = useState(false);
 
   const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
   const automaticPreview = useMemo(() => buildAdminPreview(items, selectedIds), [items, selectedIds]);
@@ -41,6 +42,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setFilters((current) => ({ ...current, [field]: value }));
     setMergedText(null);
     setMergedReportId(null);
+    setCopySucceeded(false);
   }
 
   function buildQuery(activeFilters = filters) {
@@ -76,6 +78,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id)));
       setMergedText(null);
       setMergedReportId(null);
+      setCopySucceeded(false);
     } catch (error) {
       if (requestId === latestRequestId.current) {
         setMessage(error.message);
@@ -131,12 +134,14 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setSelectedIds([]);
     setMergedText(null);
     setMergedReportId(null);
+    setCopySucceeded(false);
     loadSubmittedItems(nextFilters);
   }
 
   function toggleSelected(id) {
     setMergedText(null);
     setMergedReportId(null);
+    setCopySucceeded(false);
     setSelectedIds((current) => (
       current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
     ));
@@ -154,6 +159,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
 
     setMergedReportId(null);
     setMergedText(automaticPreview);
+    setCopySucceeded(false);
     setMessage('선택한 항목을 단위업무별로 병합했습니다.');
   }
 
@@ -184,6 +190,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       const data = await requestApi(path, { method, body, token });
       setMergedText(data.mergedText);
       setMergedReportId(data.id);
+      setCopySucceeded(false);
       await loadMergedReports();
       setMessage(mergedReportId ? '취합 결과를 수정 저장했습니다.' : '취합 결과를 저장했습니다.');
     } catch (error) {
@@ -197,6 +204,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setMergedReportId(report.id);
     setMergedText(report.mergedText);
     setSelectedIds(report.sourceItemIds ?? []);
+    setCopySucceeded(false);
     setMessage('저장된 취합 결과를 불러왔습니다.');
   }
 
@@ -208,6 +216,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
 
     try {
       await navigator.clipboard.writeText(mergedText);
+      setCopySucceeded(true);
       setMessage('최종 취합 텍스트를 복사했습니다.');
     } catch (error) {
       setMessage('브라우저에서 클립보드 복사를 허용하지 않았습니다.');
@@ -353,7 +362,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
               {mergedReportId ? '수정 저장' : '저장'}
             </button>
             <button className="primary-button compact" type="button" onClick={copyMergedText} disabled={!mergedText?.trim()}>
-              복사
+              {copySucceeded ? '복사됨' : '복사'}
             </button>
           </div>
         </div>
@@ -376,7 +385,10 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
         <textarea
           className="preview-editor"
           value={mergedText ?? automaticPreview}
-          onChange={(event) => setMergedText(event.target.value)}
+          onChange={(event) => {
+            setMergedText(event.target.value);
+            setCopySucceeded(false);
+          }}
           aria-label="팀장 취합 최종 텍스트"
         />
       </section>

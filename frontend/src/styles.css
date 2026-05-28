@@ -185,6 +185,7 @@ textarea:focus {
 
 .form-row,
 .section-header,
+.section-actions,
 .signed-in-panel,
 .mock-panel {
   display: flex;
@@ -195,6 +196,10 @@ textarea:focus {
 
 .form-row {
   gap: 14px;
+}
+
+.section-actions {
+  flex-wrap: wrap;
 }
 
 .check-label {
@@ -645,6 +650,7 @@ textarea:focus {
 
   .topbar,
   .section-header,
+  .section-actions,
   .user-tools {
     align-items: flex-start;
     flex-direction: column;
