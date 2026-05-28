@@ -18,8 +18,8 @@ Run the backend in another terminal:
 
 ```powershell
 cd C:\Users\Public\Documents\ESTsoft\CreatorTemp\metabuild-weekly-report-app
-$env:JWT_SECRET="12345678901234567890123456789012"
 .\mvnw.cmd spring-boot:run
 ```
 
-`JWT_SECRET` must be at least 32 bytes because login issues JWT access tokens.
+For local development, the backend creates a temporary JWT key when `JWT_SECRET` is not set.
+For production or token persistence across restarts, set `JWT_SECRET` to a value of at least 32 bytes.

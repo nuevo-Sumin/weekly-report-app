@@ -151,7 +151,7 @@ function AuthPanel({
                 aria-label="이메일 도메인"
               >
                 <option value="metabuild.co.kr">metabuild.co.kr</option>
-                <option value="1388.or.kr">1388.kr</option>
+                <option value="1388.kr">1388.kr</option>
               </select>
             </div>
           </label>

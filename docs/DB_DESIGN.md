@@ -44,7 +44,7 @@ DB는 필요하다.
 - 관리자는 팀원이 제출한 데이터를 조회하고 병합해야 한다.
 - 임시저장 데이터는 브라우저 종료 후에도 유지되어야 한다.
 - 저장/수정/제출 상태가 이력과 함께 관리되어야 한다.
-- CSV/Excel 업로드 결과를 사용자가 검토하고 나중에 다시 수정할 수 있어야 한다.
+- CSV 업로드 결과를 사용자가 검토하고 나중에 다시 수정할 수 있어야 한다.
 - 금주/차주 구분과 단위업무별 병합 결과를 지속적으로 관리해야 한다.
 
 DB 없이 가능한 범위는 단일 사용자용 일회성 변환 도구까지다. 현재 요구사항의 앱은 협업형 업무보고 시스템에 가까우므로 DB를 포함하는 설계가 적합하다.
@@ -61,7 +61,7 @@ MVP 기준 핵심 엔터티는 다음과 같다.
 - UploadedFile
 - UploadedFileRow
 
-초기 구현을 더 작게 가져가려면 `UploadedFileRow`는 생략할 수 있다. 다만 Excel/CSV 업로드 오류 추적과 재검토 기능을 생각하면 업로드 row 이력을 별도로 두는 편이 좋다.
+초기 구현을 더 작게 가져가려면 `UploadedFileRow`는 생략할 수 있다. 다만 CSV 업로드 오류 추적과 재검토 기능을 생각하면 업로드 row 이력을 별도로 두는 편이 좋다.
 
 ## 5. 엔터티 상세
 
@@ -112,7 +112,7 @@ role 값:
 
 ### 5.3 WeeklyReportItem
 
-팀원이 직접 입력하거나 CSV/Excel 업로드로 생성한 업무 항목을 저장한다.
+팀원이 직접 입력하거나 CSV 업로드로 생성한 업무 항목을 저장한다.
 
 주요 필드:
 
@@ -151,7 +151,6 @@ source_type 값:
 
 - `MANUAL`: 직접 입력
 - `CSV`: CSV 업로드
-- `EXCEL`: Excel 업로드
 
 save_status 값:
 
@@ -262,7 +261,7 @@ status 값:
 
 ### 5.8 UploadedFile
 
-CSV/Excel 업로드 파일의 메타데이터를 저장한다.
+CSV 업로드 파일의 메타데이터를 저장한다.
 
 주요 필드:
 
@@ -279,7 +278,6 @@ CSV/Excel 업로드 파일의 메타데이터를 저장한다.
 file_type 값:
 
 - `CSV`
-- `EXCEL`
 
 설계 메모:
 
@@ -288,14 +286,13 @@ file_type 값:
 
 ### 5.9 UploadedFileRow
 
-CSV/Excel 업로드 row별 변환 결과와 오류를 저장한다.
+CSV 업로드 row별 변환 결과와 오류를 저장한다.
 
 주요 필드:
 
 - `id`: 업로드 row 고유 ID
 - `uploaded_file_id`: UploadedFile ID
 - `row_no`: row 번호
-- `sheet_name`: Excel 시트명
 - `raw_data`: 원본 row 데이터
 - `parsed_report_item_id`: 생성된 WeeklyReportItem ID
 - `parse_status`: 파싱 상태
@@ -310,7 +307,6 @@ parse_status 값:
 
 설계 메모:
 
-- Excel 시트가 `금주`, `차주`로 분리되는 요구사항을 고려해 `sheet_name`을 둔다.
 - `raw_data`는 JSON 형태 저장을 권장하지만 DB 제품 선택 후 타입을 결정한다.
 
 ## 6. 관계 설계
@@ -443,7 +439,7 @@ MVP에서 생략 가능하지만 곧 필요해질 테이블:
 1. User, UnitTask, WeeklyReportItem으로 로그인 후 작성/저장/수정/조회 구현
 2. MergedReport로 병합 텍스트 저장 구현
 3. 관리자 조회 화면이 시작될 때 ReportSubmission 추가
-4. Excel/CSV 업로드 오류 추적이 필요해질 때 UploadedFile, UploadedFileRow 추가
+4. CSV 업로드 오류 추적이 필요해질 때 UploadedFile, UploadedFileRow 추가
 
 ## 12. 미결정 사항
 
@@ -452,8 +448,8 @@ MVP에서 생략 가능하지만 곧 필요해질 테이블:
 - 관리자 role을 회원가입 즉시 허용할지, 승인제로 운영할지
 - 제출 후 일반사용자의 수정 가능 여부
 - 단위업무를 관리자가 사전 등록할지, 사용자가 자유 입력할지
-- Excel 원본 파일을 보관할지, 파싱된 항목만 저장할지
-- 금주/차주 Excel 입력 방식을 컬럼 중심으로 할지, 시트 분리 중심으로 할지
+- CSV 원본 파일을 보관할지, 파싱된 항목만 저장할지
+- CSV 업로드 후 금주/차주/모두 선택 이력을 별도로 남길지
 - 병합 결과의 버전 이력을 남길지
 - 팀 또는 부서 개념이 필요한지
 
