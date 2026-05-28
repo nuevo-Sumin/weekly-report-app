@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: "${MYSQL_URL:jdbc:mysql://localhost:3306/weekly_report?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USER:weekly_report}
+    password: ${MYSQL_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  h2:
+    console:
+      enabled: false

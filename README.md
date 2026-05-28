@@ -28,6 +28,9 @@
   - 단위업무별 병합 미리보기
   - 병합 결과 저장/수정 저장
   - 텍스트 복사
+  - CSV 업로드
+  - row별 주차 구분 선택
+  - 정상 row 저장과 오류 row 검증 결과 표시
 - 팀장 취합 화면
   - 제출된 팀원 업무 항목 조회
   - 기간/팀원/단위업무/주차 구분 필터
@@ -56,6 +59,8 @@ MVP 단계에서는 관리자 승인을 별도 화면/API로 만들지 않고 DB
 
 팀장 취합 API는 실제 `role`이 `MANAGER`인 사용자만 접근할 수 있게 구현합니다.
 
+자세한 수동 승인 SQL과 H2/MySQL 접속 방법은 [MySQL 전환 준비 및 관리자 승인 운영](docs/MYSQL_AND_ADMIN_OPERATIONS.md)을 참고합니다.
+
 ## 실행 방법
 
 ### 백엔드
@@ -69,6 +74,22 @@ Windows PowerShell:
 또는 IntelliJ IDEA에서 `WeeklyReportApplication`을 실행합니다.
 
 로컬 개발에서는 `JWT_SECRET`이 없어도 실행 시 임시 JWT 키를 생성합니다. 운영 환경에서는 환경변수 또는 외부 설정으로 32바이트 이상의 `JWT_SECRET`을 반드시 지정해야 합니다.
+
+기본 DB는 H2 file DB이며 `./data/weekly_report`에 저장됩니다. 서버를 꺼도 `data/` 폴더를 삭제하지 않으면 회원가입 및 보고 데이터가 유지됩니다.
+
+### MySQL profile
+
+로컬 MySQL로 실행하려면 MySQL DB와 계정을 만든 뒤 `mysql` profile을 사용합니다.
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "mysql"
+$env:MYSQL_USER = "weekly_report"
+$env:MYSQL_PASSWORD = "로컬비밀번호"
+$env:JWT_SECRET = "32바이트이상의로컬개발용JWT시크릿값을넣으세요"
+.\mvnw.cmd spring-boot:run
+```
+
+MySQL 상세 설정과 관리자 승인 운영 절차는 [docs/MYSQL_AND_ADMIN_OPERATIONS.md](docs/MYSQL_AND_ADMIN_OPERATIONS.md)에 정리되어 있습니다.
 
 ### 프론트엔드
 
@@ -145,24 +166,25 @@ npm run dev
 
 ## 다음 마일스톤
 
-1. 저장된 병합 결과 목록/불러오기 UX 보강
+1. 배포 준비
+   - 개인 PC 운영 방식 또는 저비용 호스팅 방식 결정
+   - 외부 접속 보안 설정
+   - 프론트 빌드 파일 제공 방식 정리
+   - DB 백업 절차 정리
+
+2. 저장된 병합 결과 목록/불러오기 UX 보강
    - 기간별 저장 결과 목록 표시
    - 불러온 원본 항목이 현재 필터에 보이지 않을 때의 안내 개선
    - 저장된 최종본 재수정 흐름 개선
    - `DRAFT`, `SAVED`, `FINAL` 상태 표시
 
-2. CSV 업로드 안정화
-   - CSV 필수 컬럼 검증 메시지 개선
-   - 업로드 row별 오류 표시
-   - 중복/누락 데이터 안내 개선
-
-3. MySQL 전환 준비
-   - H2/MySQL profile 분리
-   - 로컬 MySQL 연결 설정 문서화
-   - 초기 스키마와 마이그레이션 전략 정리
+3. 데이터 운영 안정화
+   - MySQL 실연결 테스트
+   - 백업/복구 절차 작성
+   - H2에서 MySQL로 필요한 데이터 이관 방식 결정
 
 ## MVP 완성도 메모
 
 현재 MVP 기준 완성도는 약 80~85%입니다.
 
-완료 비중이 높은 영역은 인증, 팀원 업무 항목 API, 팀원 제출 화면, 팀장 취합 조회/프론트, 병합 결과 저장 API, 병합 원본 항목 추적, CSV 업로드 기본 흐름입니다. 남은 핵심 공백은 저장 결과 목록 UX 보강, CSV 업로드 오류 안내 안정화, MySQL 전환 준비입니다.
+완료 비중이 높은 영역은 인증, 팀원 업무 항목 API, 팀원 제출 화면, 팀장 취합 조회/프론트, 병합 결과 저장 API, 병합 원본 항목 추적, CSV 업로드 기본 흐름과 row별 검증 안내입니다. 남은 핵심 공백은 실제 배포 방식 결정, MySQL 실연결 테스트, 백업/복구 절차, 저장 결과 목록 UX 보강입니다.
