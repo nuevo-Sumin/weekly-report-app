@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -27,6 +28,9 @@ public class SecurityConfig {
             JwtAuthenticationFilter jwtAuthenticationFilter,
             ObjectMapper objectMapper
     ) throws Exception {
+        RequestMatcher frontendGetRequest = request -> "GET".equals(request.getMethod())
+                && !request.getRequestURI().startsWith("/api/");
+
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -42,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("MANAGER")
                         .requestMatchers("/api/merged-reports/**").authenticated()
                         .requestMatchers("/api/report-items/**").authenticated()
+                        .requestMatchers(frontendGetRequest).permitAll()
                         .anyRequest().denyAll()
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))

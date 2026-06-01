@@ -93,6 +93,8 @@ MySQL 상세 설정과 관리자 승인 운영 절차는 [docs/MYSQL_AND_ADMIN_O
 
 ### 프론트엔드
 
+개발 중에는 Vite 개발 서버를 사용합니다.
+
 ```powershell
 cd frontend
 npm install
@@ -100,6 +102,20 @@ npm run dev
 ```
 
 프론트엔드는 Vite 개발 서버(`http://localhost:5173`)에서 실행합니다. Vite 프록시가 `/api` 요청을 `http://localhost:8080` 백엔드로 전달합니다. 백엔드 API를 주소창에서 직접 열면 JWT 헤더가 없으므로 보호된 API는 401 응답을 반환합니다.
+
+### Spring Boot에서 프론트엔드 같이 서빙
+
+배포 또는 단일 서버 실행 전에는 React 빌드 결과를 Spring Boot 정적 리소스 폴더로 생성합니다.
+
+```powershell
+cd frontend
+npm install
+npm run build:spring
+cd ..
+.\mvnw.cmd spring-boot:run
+```
+
+이후 브라우저에서 `http://localhost:8080`을 열면 React 화면이 표시되고, 같은 서버의 `/api/**`로 백엔드 API를 호출합니다.
 
 ## 주요 API
 
