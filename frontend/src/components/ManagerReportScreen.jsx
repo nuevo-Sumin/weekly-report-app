@@ -14,7 +14,6 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   const today = useMemo(() => toDateInputValue(new Date()), []);
   const latestRequestId = useRef(0);
   const latestMergedReportsRequestId = useRef(0);
-  const [baseDate, setBaseDate] = useState(today);
   const [filters, setFilters] = useState(initialFilters);
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -23,7 +22,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   const [savedMergedReports, setSavedMergedReports] = useState([]);
   const [copySucceeded, setCopySucceeded] = useState(false);
 
-  const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
+  const weekRange = useMemo(() => getWeekRange(today), [today]);
   const automaticPreview = useMemo(() => buildAdminPreview(items, selectedIds), [items, selectedIds]);
   const hiddenSelectedCount = useMemo(
     () => selectedIds.filter((id) => !items.some((item) => item.id === id)).length,
@@ -237,14 +236,6 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
         </div>
 
         <form className="filter-grid" onSubmit={handleSearch}>
-          <label>
-            기준 일자
-            <input
-              type="date"
-              value={baseDate}
-              onChange={(event) => setBaseDate(event.target.value)}
-            />
-          </label>
           <div className="readonly-box">
             <span>보고 기간</span>
             <strong>{formatDate(weekRange.startDate)} ~ {formatDate(weekRange.endDate)}</strong>

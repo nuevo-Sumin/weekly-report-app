@@ -3,12 +3,12 @@ import { csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
 import { buildPreview } from '../reportPreview';
 import { requestApi } from '../api';
-import { parseReportCsvBufferWithErrors } from '../csvReportImport';
+import { filterCsvRowsForReportPeriod, parseReportCsvBufferWithErrors } from '../csvReportImport';
 
 function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }) {
   const today = useMemo(() => toDateInputValue(new Date()), []);
   const latestMergedReportsRequestId = useRef(0);
-  const [baseDate, setBaseDate] = useState(today);
+  const [inputMode, setInputMode] = useState('CSV');
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [reportForm, setReportForm] = useState(initialReportForm);
@@ -21,7 +21,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [csvSaveResults, setCsvSaveResults] = useState([]);
   const [copySucceeded, setCopySucceeded] = useState(false);
 
-  const weekRange = useMemo(() => getWeekRange(baseDate), [baseDate]);
+  const weekRange = useMemo(() => getWeekRange(today), [today]);
   const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
   const activeMergedText = mergedText ?? previewText;
   const isPendingManager = user.requestedRole === 'MANAGER' && user.roleApprovalStatus === 'PENDING';
@@ -74,28 +74,41 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const { rows, errors } = parseReportCsvBufferWithErrors(reader.result);
-        setCsvRows(rows.map((row) => ({
+        const parsed = parseReportCsvBufferWithErrors(reader.result);
+        const periodFiltered = filterCsvRowsForReportPeriod(parsed.rows, weekRange);
+        setCsvRows(periodFiltered.rows.map((row) => ({
           ...row,
           savedWeekTypes: getSavedCsvWeekTypes(row),
         })));
         setCsvFileName(file.name);
-        setCsvValidationResults(errors.map((error) => ({
-          key: `csv-parse-error-${error.lineNumber}`,
-          status: 'error',
-          title: 'CSV 검증 오류',
-          sourceKey: '-',
-          sourceRowNumber: error.lineNumber,
-          weekType: null,
-          message: error.message,
-        })));
+        const validationResults = [
+          ...parsed.errors.map((error) => ({
+            key: `csv-parse-error-${error.lineNumber}`,
+            status: 'error',
+            title: 'CSV 검증 오류',
+            sourceKey: '-',
+            sourceRowNumber: error.lineNumber,
+            weekType: null,
+            message: error.message,
+          })),
+          ...periodFiltered.skipped.map((skipped) => ({
+            key: `csv-period-skip-${skipped.lineNumber}`,
+            status: 'warning',
+            title: 'CSV 기간 제외',
+            sourceKey: skipped.sourceKey,
+            sourceRowNumber: skipped.lineNumber,
+            weekType: null,
+            message: skipped.message,
+          })),
+        ];
+        setCsvValidationResults(validationResults);
         setCsvSaveResults([]);
-        const errorNotice = errors.length > 0 ? ` 오류 ${errors.length}건은 제외했습니다.` : '';
-        if (rows.length === 0 && errors.length > 0) {
-          setMessage(`저장 가능한 CSV 행이 없습니다. 오류 ${errors.length}건을 확인해 주세요.`);
+        const errorNotice = validationResults.length > 0 ? ` 오류/제외 ${validationResults.length}건은 목록에서 제외했습니다.` : '';
+        if (periodFiltered.rows.length === 0 && validationResults.length > 0) {
+          setMessage(`저장 가능한 CSV 행이 없습니다. 오류/제외 ${validationResults.length}건을 확인해 주세요.`);
           return;
         }
-        setMessage(`${rows.length}개 CSV 행을 불러왔습니다.${errorNotice} 행별 주차 구분을 확인해 주세요.`);
+        setMessage(`${periodFiltered.rows.length}개 CSV 행을 불러왔습니다.${errorNotice} 행별 주차 구분을 확인해 주세요.`);
       } catch (error) {
         setCsvRows([]);
         setCsvFileName('');
@@ -288,13 +301,14 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setMessage('');
 
     try {
+      const detailContent = reportForm.detailContent?.trim() || reportForm.title;
       const body = {
         reportStartDate: weekRange.startDate,
         reportEndDate: weekRange.endDate,
         weekType: reportForm.weekType,
         unitTask: reportForm.unitTask,
         title: reportForm.title,
-        detailContent: reportForm.detailContent,
+        detailContent,
         progressContent: reportForm.progressContent,
         status: reportForm.completed ? 'DONE' : reportForm.status,
         progressRate: Number(reportForm.progressRate),
@@ -349,6 +363,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   }
 
   function editReportItem(item) {
+    setInputMode('MANUAL');
     setReportForm({
       id: item.id,
       weekType: item.weekType,
@@ -462,21 +477,33 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
           </button>
         </div>
 
-        <div className="period-grid">
-          <label>
-            기준 일자
-            <input
-              type="date"
-              value={baseDate}
-              onChange={(event) => setBaseDate(event.target.value)}
-            />
-          </label>
+        <div className="period-grid auto-period-grid">
           <div className="readonly-box">
             <span>보고 기간</span>
             <strong>{formatDate(weekRange.startDate)} ~ {formatDate(weekRange.endDate)}</strong>
           </div>
         </div>
 
+        <div className="input-mode-tabs" aria-label="업무 입력 방식 선택">
+          <button
+            type="button"
+            className={inputMode === 'CSV' ? 'active' : ''}
+            aria-pressed={inputMode === 'CSV'}
+            onClick={() => setInputMode('CSV')}
+          >
+            CSV 업로드
+          </button>
+          <button
+            type="button"
+            className={inputMode === 'MANUAL' ? 'active' : ''}
+            aria-pressed={inputMode === 'MANUAL'}
+            onClick={() => setInputMode('MANUAL')}
+          >
+            수기 입력
+          </button>
+        </div>
+
+        {inputMode === 'CSV' && (
         <div className="csv-upload-panel">
           <div className="csv-upload-actions">
             <label>
@@ -559,7 +586,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <div className="csv-result-list" role="status" aria-live="polite" aria-label="CSV 검증 결과">
               {csvValidationResults.map((result) => (
                 <p key={result.key} className={`csv-result ${result.status}`}>
-                  <span>검증 오류</span>
+                  <span>{result.status === 'warning' ? '제외' : '검증 오류'}</span>
                   <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
                   <span>#{result.sourceKey} / {result.sourceRowNumber}행 / {result.title}</span>
                   <span>{result.message}</span>
@@ -581,7 +608,9 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </div>
           )}
         </div>
+        )}
 
+        {inputMode === 'MANUAL' && (
         <form className="report-form" onSubmit={handleReportSubmit}>
           <label>
             주차 구분
@@ -608,15 +637,6 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               value={reportForm.title}
               onChange={(event) => updateReportForm('title', event.target.value)}
               placeholder="업무 제목"
-              required
-            />
-          </label>
-          <label className="wide-field">
-            업무 상세
-            <textarea
-              value={reportForm.detailContent}
-              onChange={(event) => updateReportForm('detailContent', event.target.value)}
-              placeholder="업무 상세 내용을 입력하세요."
               required
             />
           </label>
@@ -677,6 +697,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </button>
           </div>
         </form>
+        )}
       </section>
 
       <section className="tool-panel">

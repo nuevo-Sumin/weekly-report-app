@@ -136,6 +136,31 @@ h2 {
   color: #ffffff;
 }
 
+.input-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border: 1px solid #d5e4d7;
+  border-radius: 8px;
+  background: #f1f8f2;
+}
+
+.input-mode-tabs button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #46614d;
+  font-weight: 800;
+}
+
+.input-mode-tabs button.active {
+  background: #2f8f4e;
+  color: #ffffff;
+}
+
 .auth-form,
 .report-form {
   display: grid;
@@ -364,6 +389,10 @@ textarea:focus {
   margin-bottom: 18px;
 }
 
+.auto-period-grid {
+  grid-template-columns: minmax(260px, 1fr);
+}
+
 .csv-upload-panel {
   margin-bottom: 18px;
   padding: 16px;
@@ -441,6 +470,11 @@ textarea:focus {
 .csv-result.error {
   border-color: #d9a2a2;
   color: #7a2f2f;
+}
+
+.csv-result.warning {
+  border-color: #d6be7b;
+  color: #6d5414;
 }
 
 .filter-grid {
@@ -675,6 +709,7 @@ textarea:focus {
   .form-row,
   .button-row,
   .email-field-row,
+  .input-mode-tabs,
   .csv-upload-actions,
   .csv-table-summary,
   .csv-result,

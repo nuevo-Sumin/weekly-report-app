@@ -211,6 +211,30 @@ export function parseReportCsvBufferWithErrors(buffer) {
   return parseReportCsvWithErrors(decodeCsvBuffer(buffer));
 }
 
+export function filterCsvRowsForReportPeriod(rows, weekRange) {
+  return rows.reduce((acc, row) => {
+    if (!row.completed && row.status !== 'DONE') {
+      acc.rows.push(row);
+      return acc;
+    }
+
+    if (row.dueDate && row.dueDate >= weekRange.startDate && row.dueDate <= weekRange.endDate) {
+      acc.rows.push(row);
+      return acc;
+    }
+
+    acc.skipped.push({
+      lineNumber: row.sourceRowNumber,
+      sourceKey: row.sourceKey,
+      title: row.title,
+      message: row.dueDate
+        ? `${row.sourceRowNumber}행의 완료 항목은 보고기간 밖 완료기한이라 제외했습니다.`
+        : `${row.sourceRowNumber}행의 완료 항목은 완료기한이 없어 제외했습니다.`,
+    });
+    return acc;
+  }, { rows: [], skipped: [] });
+}
+
 function decodeCsvBuffer(buffer) {
   let text;
 
