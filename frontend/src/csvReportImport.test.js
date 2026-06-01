@@ -11,7 +11,7 @@ function encodeCsv(text) {
 }
 
 const validCsv = [
-  '#,제목,상태,범주,진척도,완료기한',
+  '#,제목,상태,범주,진척도,완료기한,완료일',
   '1,정상 업무,진행중,공통,50,2026-05-29',
 ].join('\n');
 
@@ -76,11 +76,11 @@ const mixedCsv = [
 
 {
   const completedCsv = [
-    '#,제목,상태,범주,진척도,완료기한',
-    '1,기간 안 완료,완료,공통,100,2026-05-27',
-    '2,기간 밖 완료,완료,공통,100,2026-06-03',
-    '3,완료일 없음,완료,공통,100,',
-    '4,진행중 업무,진행중,공통,50,2026-06-03',
+    '#,제목,상태,범주,진척도,완료기한,완료일',
+    '1,기간 안 완료,완료,공통,100,2026-06-03,2026-05-27',
+    '2,기간 밖 완료,완료,공통,100,2026-05-27,2026-06-03',
+    '3,완료일 없음,완료,공통,100,2026-05-27,',
+    '4,진행중 업무,진행중,공통,50,2026-06-03,',
   ].join('\n');
 
   const parsed = parseReportCsvWithErrors(completedCsv);
@@ -91,4 +91,16 @@ const mixedCsv = [
 
   assert.deepEqual(result.rows.map((row) => row.title), ['기간 안 완료', '진행중 업무']);
   assert.deepEqual(result.skipped.map((row) => row.lineNumber), [3, 4]);
+  assert.equal(parsed.rows[0].completedDate, '2026-05-27');
+}
+
+{
+  const invalidCompletedDateCsv = [
+    '#,제목,상태,범주,진척도,완료일',
+    '1,완료일 오류,완료,공통,100,2026년 5월 27일',
+  ].join('\n');
+  const result = parseReportCsvWithErrors(invalidCompletedDateCsv);
+
+  assert.equal(result.rows.length, 0);
+  assert.match(result.errors[0].message, /완료일은 YYYY-MM-DD 형식이어야 합니다/);
 }

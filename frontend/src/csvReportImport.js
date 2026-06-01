@@ -6,6 +6,7 @@ const headerAliases = {
   status: ['상태'],
   progressRate: ['진척도', '진행률'],
   dueDate: ['완료기한'],
+  completedDate: ['완료일'],
   completed: ['완료여부'],
 };
 
@@ -125,19 +126,27 @@ function parseCompleted(rawCompleted, status, progressRate) {
   return ['y', 'yes', 'true', '1', '완료', '예'].includes(completed);
 }
 
-function parseDueDate(rawDueDate, rowNumber) {
-  const value = String(rawDueDate ?? '').trim();
+function parseDateField(rawDate, rowNumber, fieldLabel) {
+  const value = String(rawDate ?? '').trim();
   if (!value) {
     return '';
   }
 
   const match = value.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
   if (!match) {
-    throw new Error(`${rowNumber}행의 완료기한은 YYYY-MM-DD 형식이어야 합니다.`);
+    throw new Error(`${rowNumber}행의 ${fieldLabel}은 YYYY-MM-DD 형식이어야 합니다.`);
   }
 
   const [, year, month, day] = match;
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+function parseDueDate(rawDueDate, rowNumber) {
+  return parseDateField(rawDueDate, rowNumber, '완료기한');
+}
+
+function parseCompletedDate(rawCompletedDate, rowNumber) {
+  return parseDateField(rawCompletedDate, rowNumber, '완료일');
 }
 
 export function parseReportCsv(text) {
@@ -191,6 +200,7 @@ export function parseReportCsvWithErrors(text) {
         status,
         progressRate,
         dueDate: indexes.dueDate >= 0 ? parseDueDate(row[indexes.dueDate], rowNumber) : '',
+        completedDate: indexes.completedDate >= 0 ? parseCompletedDate(row[indexes.completedDate], rowNumber) : '',
         completed: parseCompleted(row[indexes.completed], status, progressRate),
       });
     } catch (error) {
@@ -218,7 +228,7 @@ export function filterCsvRowsForReportPeriod(rows, weekRange) {
       return acc;
     }
 
-    if (row.dueDate && row.dueDate >= weekRange.startDate && row.dueDate <= weekRange.endDate) {
+    if (row.completedDate && row.completedDate >= weekRange.startDate && row.completedDate <= weekRange.endDate) {
       acc.rows.push(row);
       return acc;
     }
@@ -227,9 +237,9 @@ export function filterCsvRowsForReportPeriod(rows, weekRange) {
       lineNumber: row.sourceRowNumber,
       sourceKey: row.sourceKey,
       title: row.title,
-      message: row.dueDate
-        ? `${row.sourceRowNumber}행의 완료 항목은 보고기간 밖 완료기한이라 제외했습니다.`
-        : `${row.sourceRowNumber}행의 완료 항목은 완료기한이 없어 제외했습니다.`,
+      message: row.completedDate
+        ? `${row.sourceRowNumber}행의 완료 항목은 보고기간 밖 완료일이라 제외했습니다.`
+        : `${row.sourceRowNumber}행의 완료 항목은 완료일이 없어 제외했습니다.`,
     });
     return acc;
   }, { rows: [], skipped: [] });

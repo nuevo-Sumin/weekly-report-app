@@ -8,6 +8,8 @@ import { filterCsvRowsForReportPeriod, parseReportCsvBufferWithErrors } from '..
 function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }) {
   const today = useMemo(() => toDateInputValue(new Date()), []);
   const latestMergedReportsRequestId = useRef(0);
+  const csvModalRef = useRef(null);
+  const csvModalCloseButtonRef = useRef(null);
   const [inputMode, setInputMode] = useState('CSV');
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -19,6 +21,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [csvFileName, setCsvFileName] = useState('');
   const [csvValidationResults, setCsvValidationResults] = useState([]);
   const [csvSaveResults, setCsvSaveResults] = useState([]);
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [copySucceeded, setCopySucceeded] = useState(false);
 
   const weekRange = useMemo(() => getWeekRange(today), [today]);
@@ -26,6 +29,9 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const activeMergedText = mergedText ?? previewText;
   const isPendingManager = user.requestedRole === 'MANAGER' && user.roleApprovalStatus === 'PENDING';
   const savedItemCount = useMemo(() => items.filter((item) => item.saveStatus === 'SAVED').length, [items]);
+  const selectedCsvRowCount = useMemo(() => csvRows.filter((row) => row.selected).length, [csvRows]);
+  const hasCsvImportState = csvRows.length > 0 || csvValidationResults.length > 0 || csvSaveResults.length > 0;
+  const allCsvRowsSelected = csvRows.length > 0 && selectedCsvRowCount === csvRows.length;
 
   useEffect(() => {
     if (token) {
@@ -35,6 +41,46 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     }
   }, [token, weekRange.startDate, weekRange.endDate]);
 
+  useEffect(() => {
+    if (!csvModalOpen) {
+      return undefined;
+    }
+
+    csvModalCloseButtonRef.current?.focus();
+
+    function handleModalKeyDown(event) {
+      if (event.key === 'Escape') {
+        setCsvModalOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusableElements = csvModalRef.current?.querySelectorAll(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+      );
+      const focusableList = Array.from(focusableElements ?? []);
+      if (focusableList.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableList[0];
+      const lastElement = focusableList[focusableList.length - 1];
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener('keydown', handleModalKeyDown);
+    return () => document.removeEventListener('keydown', handleModalKeyDown);
+  }, [csvModalOpen]);
+
   function updateReportForm(field, value) {
     setReportForm((current) => ({ ...current, [field]: value }));
   }
@@ -43,6 +89,18 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setCsvRows((current) => current.map((row) => (
       row.tempId === tempId ? { ...row, [field]: value } : row
     )));
+  }
+
+  function clearCsvImport() {
+    setCsvRows([]);
+    setCsvFileName('');
+    setCsvValidationResults([]);
+    setCsvSaveResults([]);
+    setCsvModalOpen(false);
+  }
+
+  function updateAllCsvRowsSelected(selected) {
+    setCsvRows((current) => current.map((row) => ({ ...row, selected })));
   }
 
   function getPendingWeekTypes(row) {
@@ -94,15 +152,16 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
           ...periodFiltered.skipped.map((skipped) => ({
             key: `csv-period-skip-${skipped.lineNumber}`,
             status: 'warning',
-            title: 'CSV 기간 제외',
+            title: skipped.title,
             sourceKey: skipped.sourceKey,
             sourceRowNumber: skipped.lineNumber,
             weekType: null,
-            message: skipped.message,
+            message: '기존 완료건',
           })),
         ];
         setCsvValidationResults(validationResults);
         setCsvSaveResults([]);
+        setCsvModalOpen(true);
         const errorNotice = validationResults.length > 0 ? ` 오류/제외 ${validationResults.length}건은 목록에서 제외했습니다.` : '';
         if (periodFiltered.rows.length === 0 && validationResults.length > 0) {
           setMessage(`저장 가능한 CSV 행이 없습니다. 오류/제외 ${validationResults.length}건을 확인해 주세요.`);
@@ -114,6 +173,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         setCsvFileName('');
         setCsvValidationResults([]);
         setCsvSaveResults([]);
+        setCsvModalOpen(false);
         setMessage(error.message);
       } finally {
         event.target.value = '';
@@ -221,6 +281,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       if (failedCount === 0) {
         setCsvRows([]);
         setCsvFileName('');
+        setCsvModalOpen(false);
       } else {
         setCsvRows((current) => current.map((row) => (
           savedWeekTypesByRow[row.tempId]
@@ -513,101 +574,157 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <button
               className="secondary-button"
               type="button"
-              onClick={() => {
-                setCsvRows([]);
-                setCsvFileName('');
-                setCsvValidationResults([]);
-                setCsvSaveResults([]);
-              }}
-              disabled={(csvRows.length === 0 && csvValidationResults.length === 0 && csvSaveResults.length === 0) || isLoading}
+              onClick={clearCsvImport}
+              disabled={!hasCsvImportState || isLoading}
             >
               업로드 행 지우기
             </button>
           </div>
           <p className="helper-text">
-            CSV 양식은 원본 PMS 파일의 #, 제목, 상태, 범주, 진척도 컬럼을 사용합니다. 주차 구분은 업로드 후 행별로 선택합니다.
+            CSV 양식은 원본 PMS 파일의 #, 제목, 상태, 범주, 진척도, 완료일 컬럼을 사용합니다. 완료 항목은 완료일이 보고 기간 안에 있는 경우만 가져옵니다.
           </p>
 
-          {csvRows.length > 0 && (
-            <div className="items-table-wrap csv-table-wrap">
-              <div className="csv-table-summary">
-                <strong>{csvFileName}</strong>
-                <button className="primary-button compact" type="button" onClick={saveCsvRows} disabled={isLoading}>
-                  선택 행 저장
-                </button>
+          {hasCsvImportState && (
+            <div className="csv-import-card">
+              <div>
+                <strong>{csvFileName || 'CSV 처리 결과'}</strong>
+                <span>가져올 행 {csvRows.length}건 · 선택 {selectedCsvRowCount}건 · 오류/제외 {csvValidationResults.length}건</span>
               </div>
-              <table className="items-table csv-items-table" aria-label="CSV 업로드 대기 목록">
-                <thead>
-                  <tr>
-                    <th scope="col">저장</th>
-                    <th scope="col">주차</th>
-                    <th scope="col">단위업무</th>
-                    <th scope="col">세부사항</th>
-                    <th scope="col">상태</th>
-                    <th scope="col">진척도</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {csvRows.map((row) => (
-                    <tr key={row.tempId}>
-                      <td>
-                        <label className="check-label table-check">
-                          <input
-                            type="checkbox"
-                            aria-label={`${row.title} 저장 선택`}
-                            checked={row.selected}
-                            onChange={(event) => updateCsvRow(row.tempId, 'selected', event.target.checked)}
-                          />
-                        </label>
-                      </td>
-                      <td>
-                        <select
-                          aria-label={`${row.title} 주차 구분`}
-                          value={row.weekSelection}
-                          onChange={(event) => updateCsvRow(row.tempId, 'weekSelection', event.target.value)}
-                        >
-                          {Object.entries(csvWeekSelectionLabels).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>{row.unitTask}</td>
-                      <td>{row.title}</td>
-                      <td>{statusLabels[row.status]}</td>
-                      <td>{row.progressRate}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {csvValidationResults.length > 0 && (
-            <div className="csv-result-list" role="status" aria-live="polite" aria-label="CSV 검증 결과">
-              {csvValidationResults.map((result) => (
-                <p key={result.key} className={`csv-result ${result.status}`}>
-                  <span>{result.status === 'warning' ? '제외' : '검증 오류'}</span>
-                  <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
-                  <span>#{result.sourceKey} / {result.sourceRowNumber}행 / {result.title}</span>
-                  <span>{result.message}</span>
-                </p>
-              ))}
+              <button className="primary-button compact" type="button" onClick={() => setCsvModalOpen(true)} disabled={isLoading}>
+                그리드 열기
+              </button>
             </div>
           )}
 
           {csvSaveResults.length > 0 && (
-            <div className="csv-result-list" role="status" aria-live="polite" aria-label="CSV 저장 결과">
-              {csvSaveResults.map((result) => (
-                <p key={result.key} className={`csv-result ${result.status}`}>
-                  <span>{result.status === 'success' ? '성공' : '실패'}</span>
-                  <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
-                  <span>#{result.sourceKey} / {result.sourceRowNumber}행 / {result.title}</span>
-                  <span>{result.message}</span>
-                </p>
-              ))}
+            <div className="csv-save-summary" role="status" aria-live="polite" aria-label="CSV 저장 결과">
+              <strong>CSV 저장 결과</strong>
+              <span>
+                성공 {csvSaveResults.filter((result) => result.status === 'success').length}건 · 실패 {csvSaveResults.filter((result) => result.status === 'error').length}건
+              </span>
             </div>
           )}
         </div>
+        )}
+
+        {csvModalOpen && hasCsvImportState && (
+          <div className="modal-backdrop" role="presentation">
+            <div className="csv-modal" ref={csvModalRef} role="dialog" aria-modal="true" aria-labelledby="csv-modal-title">
+              <div className="csv-modal-header">
+                <div>
+                  <p className="panel-label">CSV 업로드 그리드</p>
+                  <h3 id="csv-modal-title">{csvFileName || 'CSV 처리 결과'}</h3>
+                </div>
+                <button
+                  className="secondary-button icon-button"
+                  type="button"
+                  ref={csvModalCloseButtonRef}
+                  onClick={() => setCsvModalOpen(false)}
+                  aria-label="CSV 그리드 닫기"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="csv-grid-toolbar">
+                <div className="summary-counts">
+                  <span>가져올 행 {csvRows.length}</span>
+                  <strong>선택 {selectedCsvRowCount}</strong>
+                  <span>오류/제외 {csvValidationResults.length}</span>
+                </div>
+                <div className="button-row csv-grid-actions">
+                  <button className="secondary-button" type="button" onClick={() => updateAllCsvRowsSelected(true)} disabled={csvRows.length === 0 || isLoading}>
+                    전체 선택
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => updateAllCsvRowsSelected(false)} disabled={csvRows.length === 0 || isLoading}>
+                    전체 해제
+                  </button>
+                  <button className="primary-button compact" type="button" onClick={saveCsvRows} disabled={selectedCsvRowCount === 0 || isLoading}>
+                    선택 행 저장
+                  </button>
+                </div>
+              </div>
+
+              <div className="items-table-wrap csv-table-wrap csv-modal-table-wrap">
+                <table className="items-table csv-items-table" aria-label="CSV 업로드 대기 목록">
+                  <thead>
+                    <tr>
+                      <th scope="col">
+                        <label className="check-label table-check">
+                          <input
+                            type="checkbox"
+                            aria-label="CSV 행 전체 선택"
+                            checked={allCsvRowsSelected}
+                            disabled={csvRows.length === 0}
+                            onChange={(event) => updateAllCsvRowsSelected(event.target.checked)}
+                          />
+                        </label>
+                      </th>
+                      <th scope="col">주차</th>
+                      <th scope="col">#</th>
+                      <th scope="col">단위업무</th>
+                      <th scope="col">세부사항</th>
+                      <th scope="col">상태</th>
+                      <th scope="col">진척도</th>
+                      <th scope="col">완료일</th>
+                      <th scope="col">완료기한</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvRows.length === 0 ? (
+                      <tr>
+                        <td className="empty-state" colSpan="9">저장 가능한 CSV 행이 없습니다.</td>
+                      </tr>
+                    ) : csvRows.map((row) => (
+                      <tr key={row.tempId}>
+                        <td>
+                          <label className="check-label table-check">
+                            <input
+                              type="checkbox"
+                              aria-label={`${row.title} 저장 선택`}
+                              checked={row.selected}
+                              onChange={(event) => updateCsvRow(row.tempId, 'selected', event.target.checked)}
+                            />
+                          </label>
+                        </td>
+                        <td>
+                          <select
+                            aria-label={`${row.title} 주차 구분`}
+                            value={row.weekSelection}
+                            onChange={(event) => updateCsvRow(row.tempId, 'weekSelection', event.target.value)}
+                          >
+                            {Object.entries(csvWeekSelectionLabels).map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>{row.sourceKey}</td>
+                        <td>{row.unitTask}</td>
+                        <td className="csv-title-cell" title={row.title}>{row.title}</td>
+                        <td>{statusLabels[row.status]}</td>
+                        <td>{row.progressRate}%</td>
+                        <td>{row.completedDate || '-'}</td>
+                        <td>{row.dueDate || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {csvValidationResults.length > 0 && (
+                <div className="csv-result-list csv-modal-results" role="status" aria-live="polite" aria-label="CSV 검증 결과">
+                  {csvValidationResults.map((result) => (
+                    <p key={result.key} className={`csv-result ${result.status}`}>
+                      <span>{result.status === 'warning' ? '제외' : '검증 오류'}</span>
+                      <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
+                      <span>{result.status === 'warning' ? result.title : `#${result.sourceKey} / ${result.sourceRowNumber}행 / ${result.title}`}</span>
+                      <span>{result.message}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {inputMode === 'MANUAL' && (
