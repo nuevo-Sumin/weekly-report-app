@@ -1,7 +1,7 @@
 export const initialLoginForm = {
   loginId: '',
   password: '',
-  rememberId: false,
+  autoLogin: false,
 };
 
 export const initialSignupForm = {
@@ -55,4 +55,8 @@ export const categoryLabels = {
   EXECUTION: '수행',
 };
 
-export const issueBaseUrl = import.meta.env.VITE_ISSUE_BASE_URL || 'https://pms.metabuild.co.kr/issues';
+export const issueBaseUrl = import.meta.env.VITE_ISSUE_BASE_URL || 'https://support.kyci.or.kr/redmine';
+
+export function buildIssueUrl(sourceKey) {
+  return `${issueBaseUrl.replace(/\/$/, '')}/${encodeURIComponent(String(sourceKey).replace(/^#/, ''))}`;
+}

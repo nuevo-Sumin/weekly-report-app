@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { categoryLabels, csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels } from '../constants';
+import { buildIssueUrl, categoryLabels, csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels } from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
-import { buildPreview } from '../reportPreview';
+import { buildPreview, formatReportItemDueLabel } from '../reportPreview';
 import { requestApi } from '../api';
 import { filterCsvRowsForReportPeriod, parseReportCsvBufferWithErrors } from '../csvReportImport';
 
@@ -29,6 +29,8 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const activeMergedText = mergedText ?? previewText;
   const isPendingManager = user.requestedRole === 'MANAGER' && user.roleApprovalStatus === 'PENDING';
   const savedItemCount = useMemo(() => items.filter((item) => item.saveStatus === 'SAVED').length, [items]);
+  const selectableItemIds = useMemo(() => items.filter((item) => item.saveStatus === 'SAVED').map((item) => item.id), [items]);
+  const allSelectableItemsSelected = selectableItemIds.length > 0 && selectableItemIds.every((id) => selectedIds.includes(id));
   const selectedCsvRowCount = useMemo(() => csvRows.filter((row) => row.selected).length, [csvRows]);
   const hasCsvImportState = csvRows.length > 0 || csvValidationResults.length > 0 || csvSaveResults.length > 0;
   const allCsvRowsSelected = csvRows.length > 0 && selectedCsvRowCount === csvRows.length;
@@ -457,6 +459,17 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setMergedText(null);
   }
 
+  function toggleAllSelectedItems() {
+    if (selectableItemIds.length === 0) {
+      setMessage('선택할 저장 항목이 없습니다.');
+      return;
+    }
+    setCopySucceeded(false);
+    setSelectedIds(allSelectableItemsSelected ? [] : selectableItemIds);
+    setMergedReportId(null);
+    setMergedText(null);
+  }
+
   function loadSavedMergedReport(report) {
     setMergedReportId(report.id);
     setMergedText(report.mergedText);
@@ -526,14 +539,14 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       {isPendingManager && (
         <div className="tool-panel pending-panel">
           <p className="panel-label">PL 권한 승인 대기</p>
-          <p>현재는 팀원 권한으로 이용할 수 있습니다. 관리자 승인 후 팀장 취합 화면이 열립니다.</p>
+          <p>현재는 개발자 권한으로 이용할 수 있습니다. 관리자 승인 후 팀장 취합 화면이 열립니다.</p>
         </div>
       )}
 
       <section className="tool-panel">
         <div className="section-header">
           <div>
-            <p className="panel-label">팀원 제출 화면</p>
+            <p className="panel-label">개발자 제출 화면</p>
             <h2>업무 항목 입력</h2>
           </div>
           <button className="secondary-button" type="button" onClick={loadReportItems}>
@@ -584,7 +597,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </button>
           </div>
           <p className="helper-text">
-            CSV 양식은 원본 PMS 파일의 #, 제목, 상태, 범주, 진척도, 완료일 컬럼을 사용합니다. 완료 항목은 완료일이 보고 기간 안에 있는 경우만 가져옵니다.
+            CSV는 원본 PMS 파일 기준으로 읽고, 완료 항목은 완료일이 보고 기간 안에 있는 경우만 가져옵니다.
           </p>
 
           {hasCsvImportState && (
@@ -664,11 +677,11 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                         </label>
                       </th>
                       <th scope="col">주차</th>
-                      <th scope="col">#</th>
+                      <th scope="col">일감</th>
                       <th scope="col">단위업무</th>
                       <th scope="col">세부사항</th>
                       <th scope="col">상태</th>
-                      <th scope="col">진척도</th>
+                      <th scope="col">완료예정</th>
                       <th scope="col">완료일</th>
                       <th scope="col">완료기한</th>
                     </tr>
@@ -701,11 +714,19 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                             ))}
                           </select>
                         </td>
-                        <td>{row.sourceKey}</td>
+                        <td>
+                          {row.sourceKey ? (
+                            <a className="issue-link" href={buildIssueUrl(row.sourceKey)} target="_blank" rel="noreferrer">
+                              #{row.sourceKey}
+                            </a>
+                          ) : (
+                            <span className="muted-text">-</span>
+                          )}
+                        </td>
                         <td>{row.unitTask}</td>
                         <td className="csv-title-cell" title={row.title}>{row.title}</td>
                         <td>{statusLabels[row.status]}</td>
-                        <td>{row.progressRate}%</td>
+                        <td>{formatReportItemDueLabel(row) || '-'}</td>
                         <td>{row.completedDate || '-'}</td>
                         <td>{row.dueDate || '-'}</td>
                       </tr>
@@ -720,7 +741,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                     <p key={result.key} className={`csv-result ${result.status}`}>
                       <span>{result.status === 'warning' ? '제외' : '검증 오류'}</span>
                       <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
-                      <span>{result.status === 'warning' ? result.title : `#${result.sourceKey} / ${result.sourceRowNumber}행 / ${result.title}`}</span>
+                      <span>{result.title}</span>
                       <span>{result.message}</span>
                     </p>
                   ))}
@@ -786,16 +807,6 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </select>
           </label>
           <label>
-            진행률
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={reportForm.progressRate}
-              onChange={(event) => updateReportForm('progressRate', event.target.value)}
-            />
-          </label>
-          <label>
             완료기한
             <input
               type="date"
@@ -835,6 +846,9 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               <span>저장 {savedItemCount}</span>
               <strong>선택 {selectedIds.length}</strong>
             </div>
+            <button className="secondary-button compact" type="button" onClick={toggleAllSelectedItems} disabled={selectableItemIds.length === 0 || isLoading}>
+              {allSelectableItemsSelected ? '전체 해제' : '전체 선택'}
+            </button>
             <button className="primary-button compact" type="button" onClick={submitSelectedItems} disabled={selectedIds.length === 0 || isLoading}>
               제출
             </button>
@@ -845,12 +859,23 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
           <table className="items-table" aria-label="주간업무 항목 목록">
             <thead>
               <tr>
-                <th scope="col">선택</th>
+                <th scope="col">
+                  <label className="check-label table-check">
+                    <input
+                      type="checkbox"
+                      aria-label="제출 항목 전체 선택"
+                      checked={allSelectableItemsSelected}
+                      disabled={selectableItemIds.length === 0}
+                      onChange={toggleAllSelectedItems}
+                    />
+                  </label>
+                </th>
                 <th scope="col">구분</th>
                 <th scope="col">업무</th>
                 <th scope="col">단위업무</th>
+                <th scope="col">일감</th>
                 <th scope="col">세부사항</th>
-                <th scope="col">상태</th>
+                <th scope="col">완료예정</th>
                 <th scope="col">저장</th>
                 <th scope="col">수정</th>
               </tr>
@@ -858,7 +883,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td className="empty-state" colSpan="8">아직 저장된 항목이 없습니다.</td>
+                  <td className="empty-state" colSpan="9">아직 저장된 항목이 없습니다.</td>
                 </tr>
               ) : items.map((item) => (
                 <tr key={item.id}>
@@ -876,8 +901,17 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                   <td>{weekTypeLabels[item.weekType]}</td>
                   <td>{categoryLabels[item.category ?? 'EXECUTION']}</td>
                   <td>{item.unitTask}</td>
+                  <td>
+                    {item.sourceKey ? (
+                      <a className="issue-link" href={buildIssueUrl(item.sourceKey)} target="_blank" rel="noreferrer">
+                        #{item.sourceKey}
+                      </a>
+                    ) : (
+                      <span className="muted-text">-</span>
+                    )}
+                  </td>
                   <td>{item.title}</td>
-                  <td>{statusLabels[item.status]}</td>
+                  <td>{formatReportItemDueLabel(item) || statusLabels[item.status]}</td>
                   <td>{item.saveStatus}</td>
                   <td>
                     {item.saveStatus === 'SUBMITTED' ? (
@@ -898,7 +932,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       <section className="tool-panel preview-panel">
         <div className="section-header">
           <div>
-            <p className="panel-label">미리보기</p>
+            <p className="panel-label">최종 병합</p>
             <h2>단위업무별 병합 결과</h2>
           </div>
           <div className="button-row compact-actions">
@@ -913,7 +947,11 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </button>
           </div>
         </div>
-        <div className="saved-report-list" aria-label="저장된 병합 결과 목록">
+        <div className="saved-report-list-header">
+          <strong>최종병합 목록</strong>
+          <span>{savedMergedReports.length}건</span>
+        </div>
+        <div className="saved-report-list" aria-label="저장된 최종병합 목록">
           {savedMergedReports.length === 0 ? (
             <p className="empty-list">저장된 병합 결과가 없습니다.</p>
           ) : savedMergedReports.map((report) => (
@@ -936,7 +974,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             setMergedText(event.target.value);
             setCopySucceeded(false);
           }}
-          aria-label="팀원 병합 결과 텍스트"
+          aria-label="개발자 병합 결과 텍스트"
         />
       </section>
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { categoryLabels, issueBaseUrl, statusLabels, weekTypeLabels } from '../constants';
+import { buildIssueUrl, categoryLabels, statusLabels, weekTypeLabels } from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
-import { buildAdminPreview } from '../reportPreview';
+import { buildAdminPreview, formatReportItemDueLabel } from '../reportPreview';
 import { requestApi } from '../api';
 
 const initialFilters = {
@@ -28,6 +28,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     () => selectedIds.filter((id) => !items.some((item) => item.id === id)).length,
     [items, selectedIds],
   );
+  const allVisibleItemsSelected = items.length > 0 && items.every((item) => selectedIds.includes(item.id));
 
   useEffect(() => {
     if (token) {
@@ -42,10 +43,6 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setMergedText(null);
     setMergedReportId(null);
     setCopySucceeded(false);
-  }
-
-  function buildIssueUrl(sourceKey) {
-    return `${issueBaseUrl.replace(/\/$/, '')}/${encodeURIComponent(sourceKey)}`;
   }
 
   function buildQuery(activeFilters = filters) {
@@ -166,6 +163,13 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setMessage('선택한 항목을 단위업무별로 병합했습니다.');
   }
 
+  function toggleAllVisibleItems() {
+    setMergedText(null);
+    setMergedReportId(null);
+    setCopySucceeded(false);
+    setSelectedIds(allVisibleItemsSelected ? [] : items.map((item) => item.id));
+  }
+
   async function saveMergedReport() {
     if (!mergedReportId && selectedIds.length === 0) {
       setMessage('저장할 취합 항목을 선택해 주세요.');
@@ -232,7 +236,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
         <div className="section-header">
           <div>
             <p className="panel-label">팀장 취합 화면</p>
-            <h2>팀원 제출 내용 조회</h2>
+            <h2>개발자 제출 내용 조회</h2>
           </div>
           <button className="secondary-button" type="button" onClick={() => loadSubmittedItems()} disabled={isLoading}>
             새로고침
@@ -245,7 +249,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
             <strong>{formatDate(weekRange.startDate)} ~ {formatDate(weekRange.endDate)}</strong>
           </div>
           <label>
-            팀원 아이디
+            개발자 아이디
             <input
               value={filters.memberLoginId}
               onChange={(event) => updateFilter('memberLoginId', event.target.value)}
@@ -292,21 +296,34 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
             <span>전체 {items.length}</span>
             <strong>선택 {selectedIds.length}</strong>
           </div>
+          <button className="secondary-button compact" type="button" onClick={toggleAllVisibleItems} disabled={items.length === 0 || isLoading}>
+            {allVisibleItemsSelected ? '전체 해제' : '전체 선택'}
+          </button>
         </div>
 
         <div className="items-table-wrap">
-          <table className="items-table manager-items-table" aria-label="팀원 제출 항목 목록">
+          <table className="items-table manager-items-table" aria-label="개발자 제출 항목 목록">
             <thead>
               <tr>
-                <th scope="col">선택</th>
-                <th scope="col">팀원</th>
+                <th scope="col">
+                  <label className="check-label table-check">
+                    <input
+                      type="checkbox"
+                      aria-label="병합 대상 전체 선택"
+                      checked={allVisibleItemsSelected}
+                      disabled={items.length === 0}
+                      onChange={toggleAllVisibleItems}
+                    />
+                  </label>
+                </th>
+                <th scope="col">개발자</th>
                 <th scope="col">구분</th>
                 <th scope="col">업무</th>
                 <th scope="col">단위업무</th>
                 <th scope="col">일감</th>
                 <th scope="col">세부사항</th>
                 <th scope="col">상태</th>
-                <th scope="col">진행률</th>
+                <th scope="col">완료예정</th>
               </tr>
             </thead>
             <tbody>
@@ -344,7 +361,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
                   </td>
                   <td>{item.title}</td>
                   <td>{statusLabels[item.status]}</td>
-                  <td>{item.progressRate}%</td>
+                  <td>{formatReportItemDueLabel(item) || '-'}</td>
                 </tr>
               ))}
             </tbody>

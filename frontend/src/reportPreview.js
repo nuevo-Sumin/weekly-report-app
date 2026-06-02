@@ -11,8 +11,8 @@ function formatShortDate(dateValue) {
   return `${Number(month)}/${Number(day)}`;
 }
 
-function buildItemSuffix(item) {
-  if (item.completed || item.status === 'DONE') {
+export function formatReportItemDueLabel(item) {
+  if (item.completed || item.status === 'DONE' || Number(item.progressRate) >= 90) {
     return '완료';
   }
   if (item.dueDate) {
@@ -22,7 +22,7 @@ function buildItemSuffix(item) {
 }
 
 function buildTitleLine(item) {
-  const suffix = buildItemSuffix(item);
+  const suffix = formatReportItemDueLabel(item);
   return suffix ? `- ${item.title}(${suffix})` : `- ${item.title}`;
 }
 

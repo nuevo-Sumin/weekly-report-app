@@ -5,7 +5,6 @@ import {
   clearLoginId,
   clearSession,
   readSession,
-  saveLoginId,
   saveSession,
 } from './sessionStorage';
 import AppHeader from './components/AppHeader';
@@ -33,6 +32,7 @@ function App() {
   const session = useMemo(() => readSession(), []);
   const [mode, setMode] = useState(getInitialMode(session));
   const [token, setToken] = useState(session.token);
+  const [autoLoginEnabled, setAutoLoginEnabled] = useState(Boolean(session.token));
   const [user, setUser] = useState({
     name: session.name,
     role: session.role,
@@ -42,7 +42,7 @@ function App() {
   const [loginForm, setLoginForm] = useState({
     ...initialLoginForm,
     loginId: session.rememberedId,
-    rememberId: Boolean(session.rememberedId),
+    autoLogin: Boolean(session.token),
   });
   const [signupForm, setSignupForm] = useState(initialSignupForm);
   const [findForm, setFindForm] = useState(initialFindForm);
@@ -66,7 +66,11 @@ function App() {
         }
 
         const nextUser = toUserState(data);
-        saveSession({ ...nextUser, accessToken: token });
+        if (autoLoginEnabled) {
+          saveSession({ ...nextUser, accessToken: token });
+        } else {
+          clearSession();
+        }
         setUser(nextUser);
         setMode(nextUser.role === 'MANAGER' ? 'manager' : 'report');
       } catch (error) {
@@ -92,7 +96,7 @@ function App() {
     return () => {
       isCurrent = false;
     };
-  }, [token]);
+  }, [token, autoLoginEnabled]);
 
   function updateLoginForm(field, value) {
     setLoginForm((current) => ({ ...current, [field]: value }));
@@ -124,13 +128,13 @@ function App() {
         },
       });
 
-      if (loginForm.rememberId) {
-        saveLoginId(loginForm.loginId);
+      clearLoginId();
+      if (loginForm.autoLogin) {
+        saveSession(data);
       } else {
-        clearLoginId();
+        clearSession();
       }
-
-      saveSession(data);
+      setAutoLoginEnabled(loginForm.autoLogin);
       setToken(data.accessToken);
       setUser(toUserState(data));
       setLoginForm((current) => ({ ...current, password: '' }));
@@ -189,6 +193,8 @@ function App() {
 
   function handleLogout() {
     clearSession();
+    clearLoginId();
+    setAutoLoginEnabled(false);
     setToken('');
     setUser({
       name: '',

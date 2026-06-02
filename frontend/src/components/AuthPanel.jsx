@@ -66,10 +66,10 @@ function AuthPanel({
             <label className="check-label">
               <input
                 type="checkbox"
-                checked={loginForm.rememberId}
-                onChange={(event) => onLoginChange('rememberId', event.target.checked)}
+                checked={loginForm.autoLogin}
+                onChange={(event) => onLoginChange('autoLogin', event.target.checked)}
               />
-              아이디 기억하기
+              자동 로그인
             </label>
             <button className="link-button" type="button" onClick={() => onModeChange('findAccount')}>
               아이디/패스워드 찾기
