@@ -12,6 +12,7 @@ import com.metabuild.weeklyreport.auth.dto.SignupRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemSubmitRequest;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemCategory;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
 import com.metabuild.weeklyreport.user.entity.RoleApprovalStatus;
@@ -74,6 +75,7 @@ class AdminReportItemIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].saveStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data[0].category").value("EXECUTION"))
                 .andExpect(jsonPath("$.data[0].authorLoginId").exists())
                 .andExpect(jsonPath("$.data[1].saveStatus").value("SUBMITTED"));
 
@@ -159,6 +161,7 @@ class AdminReportItemIntegrationTest {
                 REPORT_START_DATE,
                 REPORT_END_DATE,
                 weekType,
+                ReportItemCategory.EXECUTION,
                 unitTask,
                 "팀장 취합 API",
                 "팀장 취합용 제출 항목",

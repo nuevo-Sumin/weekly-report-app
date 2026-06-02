@@ -1,7 +1,9 @@
 package com.metabuild.weeklyreport.reportitem.dto;
 
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemCategory;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
 import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
 import java.time.LocalDate;
@@ -15,6 +17,7 @@ public record AdminReportItemResponse(
         LocalDate reportStartDate,
         LocalDate reportEndDate,
         WeekType weekType,
+        ReportItemCategory category,
         String unitTask,
         String title,
         String detailContent,
@@ -23,6 +26,9 @@ public record AdminReportItemResponse(
         int progressRate,
         LocalDate dueDate,
         boolean completed,
+        ReportItemSourceType sourceType,
+        String sourceKey,
+        Integer sourceRowNumber,
         SaveStatus saveStatus,
         LocalDateTime submittedAt,
         LocalDateTime createdAt,
@@ -38,6 +44,7 @@ public record AdminReportItemResponse(
                 item.getReportStartDate(),
                 item.getReportEndDate(),
                 item.getWeekType(),
+                item.getCategory() == null ? ReportItemCategory.EXECUTION : item.getCategory(),
                 item.getUnitTask(),
                 item.getTitle(),
                 item.getDetailContent(),
@@ -46,6 +53,9 @@ public record AdminReportItemResponse(
                 item.getProgressRate(),
                 item.getDueDate(),
                 item.isCompleted(),
+                item.getSourceType() == null ? ReportItemSourceType.MANUAL : item.getSourceType(),
+                item.getSourceKey(),
+                item.getSourceRowNumber(),
                 item.getSaveStatus(),
                 item.getSubmittedAt(),
                 item.getCreatedAt(),

@@ -647,7 +647,7 @@ textarea:focus {
 }
 
 .manager-items-table {
-  min-width: 980px;
+  min-width: 1180px;
 }
 
 .items-table th,
@@ -692,6 +692,16 @@ textarea:focus {
 .muted-text {
   color: #6b7f70;
   font-weight: 700;
+}
+
+.issue-link {
+  color: #1f6f3f;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.issue-link:hover {
+  text-decoration: underline;
 }
 
 .table-subtext {

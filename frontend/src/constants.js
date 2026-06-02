@@ -21,6 +21,7 @@ export const initialFindForm = {
 export const initialReportForm = {
   id: null,
   weekType: 'THIS_WEEK',
+  category: 'EXECUTION',
   unitTask: '',
   title: '',
   detailContent: '',
@@ -48,3 +49,10 @@ export const csvWeekSelectionLabels = {
   NEXT_WEEK: '차주',
   ALL: '모두',
 };
+
+export const categoryLabels = {
+  BUSINESS_MANAGEMENT: '사업관리',
+  EXECUTION: '수행',
+};
+
+export const issueBaseUrl = import.meta.env.VITE_ISSUE_BASE_URL || 'https://pms.metabuild.co.kr/issues';

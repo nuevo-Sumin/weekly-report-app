@@ -13,6 +13,7 @@ import com.metabuild.weeklyreport.auth.dto.SignupRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemSubmitRequest;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemCategory;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
@@ -59,6 +60,7 @@ class WeeklyReportItemIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].id").value(itemId))
+                .andExpect(jsonPath("$.data[0].category").value("EXECUTION"))
                 .andExpect(jsonPath("$.data[0].unitTask").value("주간보고 API"))
                 .andExpect(jsonPath("$.data[0].saveStatus").value("DRAFT"));
 
@@ -138,6 +140,7 @@ class WeeklyReportItemIntegrationTest {
                 LocalDate.of(2026, 5, 25),
                 LocalDate.of(2026, 5, 31),
                 WeekType.THIS_WEEK,
+                ReportItemCategory.EXECUTION,
                 "수정된 업무",
                 "수정된 CSV 항목",
                 "수정된 CSV 항목",
@@ -182,7 +185,8 @@ class WeeklyReportItemIntegrationTest {
                 LocalDate.of(2026, 5, 25),
                 LocalDate.of(2026, 5, 31),
                 WeekType.THIS_WEEK,
-                "수동 업무",
+                ReportItemCategory.BUSINESS_MANAGEMENT,
+                null,
                 "수동 항목",
                 "수동 항목 상세",
                 "수동 진행 내용",
@@ -202,6 +206,8 @@ class WeeklyReportItemIntegrationTest {
                         .content(objectMapper.writeValueAsString(manualRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.sourceType").value("MANUAL"))
+                .andExpect(jsonPath("$.data.category").value("BUSINESS_MANAGEMENT"))
+                .andExpect(jsonPath("$.data.unitTask").value("사업관리"))
                 .andExpect(jsonPath("$.data.sourceKey").doesNotExist())
                 .andExpect(jsonPath("$.data.sourceRowNumber").doesNotExist());
     }
@@ -286,6 +292,7 @@ class WeeklyReportItemIntegrationTest {
                 LocalDate.of(2026, 5, 25),
                 LocalDate.of(2026, 5, 31),
                 WeekType.THIS_WEEK,
+                ReportItemCategory.EXECUTION,
                 unitTask,
                 "항목 API 구현",
                 "주간보고 항목 백엔드 API 작성",
@@ -306,6 +313,7 @@ class WeeklyReportItemIntegrationTest {
                 LocalDate.of(2026, 5, 25),
                 LocalDate.of(2026, 5, 31),
                 weekType,
+                ReportItemCategory.EXECUTION,
                 "주간보고 API",
                 "CSV 항목",
                 "CSV 항목",

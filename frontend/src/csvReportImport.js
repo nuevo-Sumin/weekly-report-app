@@ -126,6 +126,14 @@ function parseCompleted(rawCompleted, status, progressRate) {
   return ['y', 'yes', 'true', '1', '완료', '예'].includes(completed);
 }
 
+function normalizeCsvUnitTask(rawUnitTask) {
+  const unitTask = String(rawUnitTask ?? '').trim();
+  if (!unitTask) {
+    return '미분류';
+  }
+  return ['개인정보보호', '연계'].includes(unitTask) ? '공통' : unitTask;
+}
+
 function parseDateField(rawDate, rowNumber, fieldLabel) {
   const value = String(rawDate ?? '').trim();
   if (!value) {
@@ -193,7 +201,8 @@ export function parseReportCsvWithErrors(text) {
         weekSelection: 'THIS_WEEK',
         sourceKey: csvId,
         sourceRowNumber: rowNumber,
-        unitTask: indexes.unitTask >= 0 ? (row[indexes.unitTask]?.trim() || '미분류') : '미분류',
+        category: 'EXECUTION',
+        unitTask: indexes.unitTask >= 0 ? normalizeCsvUnitTask(row[indexes.unitTask]) : '미분류',
         title,
         detailContent: title,
         progressContent: indexes.progressContent >= 0 ? (row[indexes.progressContent]?.trim() || title) : title,

@@ -1,6 +1,7 @@
 package com.metabuild.weeklyreport.reportitem.dto;
 
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemCategory;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
@@ -15,6 +16,7 @@ public record ReportItemResponse(
         LocalDate reportStartDate,
         LocalDate reportEndDate,
         WeekType weekType,
+        ReportItemCategory category,
         String unitTask,
         String title,
         String detailContent,
@@ -40,6 +42,7 @@ public record ReportItemResponse(
                 item.getReportStartDate(),
                 item.getReportEndDate(),
                 item.getWeekType(),
+                item.getCategory() == null ? ReportItemCategory.EXECUTION : item.getCategory(),
                 item.getUnitTask(),
                 item.getTitle(),
                 item.getDetailContent(),

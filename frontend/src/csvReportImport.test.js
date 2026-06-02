@@ -29,6 +29,7 @@ const mixedCsv = [
 
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0].title, '정상 업무');
+  assert.equal(result.rows[0].category, 'EXECUTION');
   assert.equal(result.rows[0].detailContent, '정상 업무');
   assert.equal(result.rows[0].dueDate, '2026-05-29');
   assert.deepEqual(result.errors.map((error) => error.lineNumber), [3, 4, 5, 6]);
@@ -103,4 +104,16 @@ const mixedCsv = [
 
   assert.equal(result.rows.length, 0);
   assert.match(result.errors[0].message, /완료일은 YYYY-MM-DD 형식이어야 합니다/);
+}
+
+{
+  const unitTaskMappedCsv = [
+    '#,제목,상태,범주,진척도',
+    '1,개인정보 업무,진행중,개인정보보호,10',
+    '2,연계 업무,진행중,연계,10',
+    '3,학교밖 업무,진행중,학교밖청소년지원센터,10',
+  ].join('\n');
+  const result = parseReportCsvWithErrors(unitTaskMappedCsv);
+
+  assert.deepEqual(result.rows.map((row) => row.unitTask), ['공통', '공통', '학교밖청소년지원센터']);
 }

@@ -53,6 +53,10 @@ public class WeeklyReportItem {
     @Column(nullable = false, length = 20)
     private WeekType weekType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private ReportItemCategory category;
+
     @Column(nullable = false, length = 120)
     private String unitTask;
 
@@ -106,6 +110,7 @@ public class WeeklyReportItem {
             LocalDate reportStartDate,
             LocalDate reportEndDate,
             WeekType weekType,
+            ReportItemCategory category,
             String unitTask,
             String title,
             String detailContent,
@@ -123,6 +128,7 @@ public class WeeklyReportItem {
         this.reportStartDate = reportStartDate;
         this.reportEndDate = reportEndDate;
         this.weekType = weekType;
+        this.category = category;
         this.unitTask = unitTask;
         this.title = title;
         this.detailContent = detailContent;
@@ -141,6 +147,7 @@ public class WeeklyReportItem {
             LocalDate reportStartDate,
             LocalDate reportEndDate,
             WeekType weekType,
+            ReportItemCategory category,
             String unitTask,
             String title,
             String detailContent,
@@ -157,6 +164,7 @@ public class WeeklyReportItem {
         this.reportStartDate = reportStartDate;
         this.reportEndDate = reportEndDate;
         this.weekType = weekType;
+        this.category = category;
         this.unitTask = unitTask;
         this.title = title;
         this.detailContent = detailContent;
@@ -188,6 +196,9 @@ public class WeeklyReportItem {
         if (this.sourceType == null) {
             this.sourceType = ReportItemSourceType.MANUAL;
         }
+        if (this.category == null) {
+            this.category = ReportItemCategory.EXECUTION;
+        }
         this.createdAt = now;
         this.updatedAt = now;
     }
@@ -215,6 +226,10 @@ public class WeeklyReportItem {
 
     public WeekType getWeekType() {
         return weekType;
+    }
+
+    public ReportItemCategory getCategory() {
+        return category;
     }
 
     public String getUnitTask() {

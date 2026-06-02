@@ -16,6 +16,7 @@ import com.metabuild.weeklyreport.mergedreport.entity.MergedReport;
 import com.metabuild.weeklyreport.mergedreport.entity.MergedReportStatus;
 import com.metabuild.weeklyreport.mergedreport.repository.MergedReportRepository;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemCategory;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
 import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
@@ -385,6 +386,7 @@ class MergedReportIntegrationTest {
                 REPORT_START_DATE,
                 REPORT_END_DATE,
                 WeekType.THIS_WEEK,
+                ReportItemCategory.EXECUTION,
                 "Unit Task",
                 title,
                 title,

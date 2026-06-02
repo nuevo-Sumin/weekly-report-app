@@ -5,6 +5,7 @@ import com.metabuild.weeklyreport.reportitem.dto.ReportItemRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemResponse;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemSubmitRequest;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemCategory;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
@@ -48,7 +49,8 @@ public class WeeklyReportItemService {
                 request.reportStartDate(),
                 request.reportEndDate(),
                 request.weekType(),
-                trim(request.unitTask()),
+                normalizeCategory(request.category()),
+                normalizeUnitTask(request.category(), request.unitTask()),
                 trim(request.title()),
                 trim(request.detailContent()),
                 trim(request.progressContent()),
@@ -106,7 +108,8 @@ public class WeeklyReportItemService {
                 request.reportStartDate(),
                 request.reportEndDate(),
                 request.weekType(),
-                trim(request.unitTask()),
+                normalizeCategory(request.category()),
+                normalizeUnitTask(request.category(), request.unitTask()),
                 trim(request.title()),
                 trim(request.detailContent()),
                 trim(request.progressContent()),
@@ -190,6 +193,17 @@ public class WeeklyReportItemService {
 
     private ReportItemSourceType normalizeSourceType(ReportItemSourceType sourceType) {
         return sourceType == null ? ReportItemSourceType.MANUAL : sourceType;
+    }
+
+    private ReportItemCategory normalizeCategory(ReportItemCategory category) {
+        return category == null ? ReportItemCategory.EXECUTION : category;
+    }
+
+    private String normalizeUnitTask(ReportItemCategory category, String unitTask) {
+        if (normalizeCategory(category) == ReportItemCategory.BUSINESS_MANAGEMENT) {
+            return "사업관리";
+        }
+        return trim(unitTask);
     }
 
     private String normalizeSourceKey(ReportItemSourceType sourceType, String sourceKey) {

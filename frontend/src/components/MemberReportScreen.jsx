@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels } from '../constants';
+import { categoryLabels, csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels } from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
 import { buildPreview } from '../reportPreview';
 import { requestApi } from '../api';
@@ -222,6 +222,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                 reportStartDate: weekRange.startDate,
                 reportEndDate: weekRange.endDate,
                 weekType,
+                category: row.category,
                 unitTask: row.unitTask,
                 title: row.title,
                 detailContent: row.title,
@@ -367,10 +368,11 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         reportStartDate: weekRange.startDate,
         reportEndDate: weekRange.endDate,
         weekType: reportForm.weekType,
-        unitTask: reportForm.unitTask,
+        category: reportForm.category,
+        unitTask: reportForm.category === 'BUSINESS_MANAGEMENT' ? '사업관리' : reportForm.unitTask,
         title: reportForm.title,
         detailContent,
-        progressContent: reportForm.progressContent,
+        progressContent: reportForm.progressContent?.trim() || reportForm.title,
         status: reportForm.completed ? 'DONE' : reportForm.status,
         progressRate: Number(reportForm.progressRate),
         dueDate: reportForm.dueDate || null,
@@ -428,6 +430,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setReportForm({
       id: item.id,
       weekType: item.weekType,
+      category: item.category ?? 'EXECUTION',
       unitTask: item.unitTask,
       title: item.title,
       detailContent: item.detailContent,
@@ -740,6 +743,18 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </select>
           </label>
           <label>
+            업무 구분
+            <select
+              value={reportForm.category}
+              onChange={(event) => updateReportForm('category', event.target.value)}
+            >
+              {Object.entries(categoryLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          {reportForm.category === 'EXECUTION' && (
+          <label>
             단위업무
             <input
               value={reportForm.unitTask}
@@ -748,21 +763,13 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               required
             />
           </label>
+          )}
           <label>
             세부사항
             <input
               value={reportForm.title}
               onChange={(event) => updateReportForm('title', event.target.value)}
               placeholder="업무 제목"
-              required
-            />
-          </label>
-          <label className="wide-field">
-            진행내용
-            <textarea
-              value={reportForm.progressContent}
-              onChange={(event) => updateReportForm('progressContent', event.target.value)}
-              placeholder="금주 진행 또는 차주 예정 내용을 입력하세요."
               required
             />
           </label>
@@ -840,6 +847,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               <tr>
                 <th scope="col">선택</th>
                 <th scope="col">구분</th>
+                <th scope="col">업무</th>
                 <th scope="col">단위업무</th>
                 <th scope="col">세부사항</th>
                 <th scope="col">상태</th>
@@ -850,7 +858,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td className="empty-state" colSpan="7">아직 저장된 항목이 없습니다.</td>
+                  <td className="empty-state" colSpan="8">아직 저장된 항목이 없습니다.</td>
                 </tr>
               ) : items.map((item) => (
                 <tr key={item.id}>
@@ -866,6 +874,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                     </label>
                   </td>
                   <td>{weekTypeLabels[item.weekType]}</td>
+                  <td>{categoryLabels[item.category ?? 'EXECUTION']}</td>
                   <td>{item.unitTask}</td>
                   <td>{item.title}</td>
                   <td>{statusLabels[item.status]}</td>

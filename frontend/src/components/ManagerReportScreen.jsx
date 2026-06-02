@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { statusLabels, weekTypeLabels } from '../constants';
+import { categoryLabels, issueBaseUrl, statusLabels, weekTypeLabels } from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
 import { buildAdminPreview } from '../reportPreview';
 import { requestApi } from '../api';
@@ -42,6 +42,10 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setMergedText(null);
     setMergedReportId(null);
     setCopySucceeded(false);
+  }
+
+  function buildIssueUrl(sourceKey) {
+    return `${issueBaseUrl.replace(/\/$/, '')}/${encodeURIComponent(sourceKey)}`;
   }
 
   function buildQuery(activeFilters = filters) {
@@ -297,7 +301,9 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
                 <th scope="col">선택</th>
                 <th scope="col">팀원</th>
                 <th scope="col">구분</th>
+                <th scope="col">업무</th>
                 <th scope="col">단위업무</th>
+                <th scope="col">일감</th>
                 <th scope="col">세부사항</th>
                 <th scope="col">상태</th>
                 <th scope="col">진행률</th>
@@ -306,7 +312,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td className="empty-state" colSpan="7">조회된 제출 항목이 없습니다.</td>
+                  <td className="empty-state" colSpan="9">조회된 제출 항목이 없습니다.</td>
                 </tr>
               ) : items.map((item) => (
                 <tr key={item.id}>
@@ -325,7 +331,17 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
                     <span className="table-subtext">{item.authorLoginId}</span>
                   </td>
                   <td>{weekTypeLabels[item.weekType]}</td>
+                  <td>{categoryLabels[item.category ?? 'EXECUTION']}</td>
                   <td>{item.unitTask}</td>
+                  <td>
+                    {item.sourceKey ? (
+                      <a className="issue-link" href={buildIssueUrl(item.sourceKey)} target="_blank" rel="noreferrer">
+                        #{item.sourceKey}
+                      </a>
+                    ) : (
+                      <span className="muted-text">-</span>
+                    )}
+                  </td>
                   <td>{item.title}</td>
                   <td>{statusLabels[item.status]}</td>
                   <td>{item.progressRate}%</td>

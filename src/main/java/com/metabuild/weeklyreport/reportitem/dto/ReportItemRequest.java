@@ -1,6 +1,7 @@
 package com.metabuild.weeklyreport.reportitem.dto;
 
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
+import com.metabuild.weeklyreport.reportitem.entity.ReportItemCategory;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemSourceType;
 import com.metabuild.weeklyreport.reportitem.entity.SaveStatus;
 import com.metabuild.weeklyreport.reportitem.entity.WeekType;
@@ -22,7 +23,8 @@ public record ReportItemRequest(
         @NotNull
         WeekType weekType,
 
-        @NotBlank
+        ReportItemCategory category,
+
         @Size(max = 120)
         String unitTask,
 
@@ -68,5 +70,10 @@ public record ReportItemRequest(
     @AssertTrue(message = "sourceKey is required when sourceType is CSV")
     public boolean isValidCsvSourceKey() {
         return sourceType != ReportItemSourceType.CSV || (sourceKey != null && !sourceKey.isBlank());
+    }
+
+    @AssertTrue(message = "unitTask is required when category is EXECUTION")
+    public boolean isValidUnitTask() {
+        return category == ReportItemCategory.BUSINESS_MANAGEMENT || (unitTask != null && !unitTask.isBlank());
     }
 }

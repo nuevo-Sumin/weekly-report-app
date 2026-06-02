@@ -1,5 +1,38 @@
 import { formatDate } from './dateUtils';
-import { weekTypeLabels } from './constants';
+import { statusLabels, weekTypeLabels } from './constants';
+
+const weekOrder = ['THIS_WEEK', 'NEXT_WEEK'];
+
+function formatShortDate(dateValue) {
+  if (!dateValue) {
+    return '';
+  }
+  const [, month, day] = dateValue.split('-');
+  return `${Number(month)}/${Number(day)}`;
+}
+
+function buildItemSuffix(item) {
+  if (item.completed || item.status === 'DONE') {
+    return '완료';
+  }
+  if (item.dueDate) {
+    return `~${formatShortDate(item.dueDate)}`;
+  }
+  return statusLabels[item.status] ?? '';
+}
+
+function buildTitleLine(item) {
+  const suffix = buildItemSuffix(item);
+  return suffix ? `- ${item.title}(${suffix})` : `- ${item.title}`;
+}
+
+function groupByUnitTask(items) {
+  return items.reduce((acc, item) => {
+    const unitTask = item.unitTask || '미분류';
+    acc[unitTask] = [...(acc[unitTask] ?? []), item];
+    return acc;
+  }, {});
+}
 
 export function buildPreview(items, selectedIds) {
   const selectedItems = items.filter((item) => selectedIds.includes(item.id));
@@ -8,24 +41,20 @@ export function buildPreview(items, selectedIds) {
     return '선택된 항목이 없습니다.';
   }
 
-  const [firstItem] = selectedItems;
-  const sections = ['THIS_WEEK', 'NEXT_WEEK'].map((weekType) => {
+  const sections = weekOrder.map((weekType) => {
     const weeklyItems = selectedItems.filter((item) => item.weekType === weekType);
-    const grouped = weeklyItems.reduce((acc, item) => {
-      acc[item.unitTask] = [...(acc[item.unitTask] ?? []), item];
-      return acc;
-    }, {});
+    const grouped = groupByUnitTask(weeklyItems);
 
     const lines = Object.entries(grouped).flatMap(([unitTask, groupItems]) => [
       `[${unitTask}]`,
-      ...groupItems.map((item) => `- ${item.title}: ${item.progressContent}`),
+      ...groupItems.map(buildTitleLine),
     ]);
 
     return [`### ${weekTypeLabels[weekType]}`, ...(lines.length ? lines : ['선택된 항목 없음'])].join('\n');
   });
 
   return [
-    `## 주간업무보고 (${formatDate(firstItem.reportStartDate)} ~ ${formatDate(firstItem.reportEndDate)})`,
+    `## 주간업무보고 (${formatDate(selectedItems[0].reportStartDate)} ~ ${formatDate(selectedItems[0].reportEndDate)})`,
     '',
     ...sections,
   ].join('\n\n');
@@ -38,25 +67,32 @@ export function buildAdminPreview(items, selectedIds) {
     return '선택된 항목이 없습니다.';
   }
 
-  const [firstItem] = selectedItems;
-  const sections = ['THIS_WEEK', 'NEXT_WEEK'].map((weekType) => {
+  const sections = weekOrder.map((weekType) => {
     const weeklyItems = selectedItems.filter((item) => item.weekType === weekType);
-    const grouped = weeklyItems.reduce((acc, item) => {
-      acc[item.unitTask] = [...(acc[item.unitTask] ?? []), item];
-      return acc;
-    }, {});
-
-    const lines = Object.entries(grouped).flatMap(([unitTask, groupItems]) => [
-      `[${unitTask}]`,
-      ...groupItems.map((item) => `- ${item.authorName} / ${item.title}: ${item.progressContent}`),
+    const businessItems = weeklyItems.filter((item) => item.category === 'BUSINESS_MANAGEMENT');
+    const executionItems = weeklyItems.filter((item) => item.category !== 'BUSINESS_MANAGEMENT');
+    const executionGroups = Object.entries(groupByUnitTask(executionItems));
+    const executionLines = executionGroups.flatMap(([unitTask, groupItems], index) => [
+      `(${index + 1}) ${unitTask}`,
+      ...groupItems.map(buildTitleLine),
+      '',
     ]);
 
-    return [`### ${weekTypeLabels[weekType]}`, ...(lines.length ? lines : ['선택된 항목 없음'])].join('\n');
+    return [
+      `[${weekTypeLabels[weekType]}]`,
+      '1. 사업관리',
+      ...(businessItems.length ? businessItems.map(buildTitleLine) : []),
+      '',
+      '2. 수행',
+      ...(executionLines.length ? executionLines.slice(0, -1) : []),
+    ].join('\n').trimEnd();
   });
 
   return [
-    `## 주간업무보고 취합 (${formatDate(firstItem.reportStartDate)} ~ ${formatDate(firstItem.reportEndDate)})`,
+    sections[0],
     '',
-    ...sections,
-  ].join('\n\n');
+    '-------------------------------------------------------------------',
+    '',
+    sections[1],
+  ].join('\n');
 }
