@@ -216,3 +216,4 @@ cd backend
 - [DB 설계](docs/DB_DESIGN.md)
 - [UI 설계](docs/WEEKLY_REPORT_UI_DESIGN.md)
 - [MySQL 전환 및 관리자 승인 운영](docs/MYSQL_AND_ADMIN_OPERATIONS.md)
+- [Oracle Cloud 배포 가이드](docs/ORACLE_DEPLOYMENT.md)

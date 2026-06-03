@@ -5,6 +5,7 @@ target/
 data/
 backups/
 backend/config/application-local.yml
+backend/config/weekly-report.env
 backend/scripts/init-mysql.sql
 *.db
 *.mv.db

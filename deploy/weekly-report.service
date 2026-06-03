@@ -1,0 +1,16 @@
+[Unit]
+Description=Weekly Report Spring Boot App
+After=network.target mysql.service
+
+[Service]
+User=weeklyreport
+Group=weeklyreport
+WorkingDirectory=/opt/weekly-report-app/backend
+EnvironmentFile=/etc/weekly-report/weekly-report.env
+ExecStart=/usr/bin/java -jar /opt/weekly-report-app/backend/target/weekly-report-app-0.0.1-SNAPSHOT.jar
+SuccessExitStatus=143
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
