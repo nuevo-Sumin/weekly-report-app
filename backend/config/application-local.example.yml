@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    username: weekly_report
+    password: replace-with-local-password
+
+jwt:
+  secret: replace-with-32-byte-or-longer-local-secret

@@ -48,11 +48,11 @@ PL 권한은 MVP 단계에서 자동 승인하지 않습니다. 회원가입 시
 
 ### 데이터 저장
 
-- 기본 DB는 H2 file DB
-- DB 위치: `./data/weekly_report` (백엔드를 `backend/`에서 실행해도 루트 `data/`를 사용)
-- 서버를 꺼도 `data/` 폴더를 지우지 않으면 데이터가 유지된다.
-- MySQL 전환용 profile 준비 완료
-- MySQL 실연결 테스트와 운영 이관 절차는 아직 남아 있다.
+- 기본 DB는 MySQL
+- 기본 profile은 `mysql`이며, 연결 정보는 `MYSQL_URL`, `MYSQL_USER`, `MYSQL_PASSWORD` 환경변수로 지정한다.
+- 기존 H2 file DB는 `h2` profile로 남겨 둔다.
+- H2 DB 위치: `./data/weekly_report` (백엔드를 `backend/`에서 실행해도 루트 `data/`를 사용)
+- MySQL 운영 이관 전에는 DB 생성, 회원가입, 로그인, 보고 저장, PL 취합 수동 테스트가 필요하다.
 
 ## 실행 방법
 
@@ -60,10 +60,13 @@ PL 권한은 MVP 단계에서 자동 승인하지 않습니다. 회원가입 시
 
 ```powershell
 cd backend
+$env:MYSQL_USER = "weekly_report"
+$env:MYSQL_PASSWORD = "로컬비밀번호"
+$env:JWT_SECRET = "32바이트이상의로컬개발용JWT시크릿값"
 .\mvnw.cmd spring-boot:run
 ```
 
-로컬 개발에서는 `JWT_SECRET`이 없어도 임시 키로 실행됩니다. 운영 환경에서는 32바이트 이상의 `JWT_SECRET`을 반드시 환경변수 또는 외부 설정으로 지정해야 합니다.
+기본 실행은 MySQL을 사용합니다. 로컬 개발에서는 `JWT_SECRET`이 없어도 임시 키로 실행되지만, 운영 환경에서는 32바이트 이상의 `JWT_SECRET`을 반드시 환경변수 또는 외부 설정으로 지정해야 합니다.
 
 ### 프론트엔드 개발 서버
 
@@ -98,19 +101,37 @@ cd ..\backend
 .\mvnw.cmd process-resources
 ```
 
-## MySQL profile
+## DB profile
 
-MySQL 전환용 설정 파일은 다음 위치에 있습니다.
+MySQL 설정 파일은 다음 위치에 있습니다.
 
 - `backend/src/main/resources/application-mysql.yml`
 
-예시 실행:
+기본 profile은 `mysql`입니다. 로컬 MySQL DB와 사용자를 먼저 만든 뒤 실행합니다.
+DB/사용자 생성 SQL 템플릿은 `backend/scripts/init-mysql.example.sql`에 있습니다. 실제 비밀번호를 넣은 `backend/scripts/init-mysql.sql`은 로컬 전용이며 Git에서 제외합니다.
+앱 접속 비밀번호는 `MYSQL_PASSWORD` 환경변수로 넣거나, `backend/config/application-local.example.yml`을 `backend/config/application-local.yml`로 복사한 뒤 같은 비밀번호를 적어 둡니다. `application-local.yml`도 Git에서 제외됩니다. IntelliJ 실행 위치가 프로젝트 루트이든 `backend/`이든 이 파일을 읽도록 설정되어 있습니다.
 
 ```powershell
-$env:SPRING_PROFILES_ACTIVE = "mysql"
 $env:MYSQL_USER = "weekly_report"
 $env:MYSQL_PASSWORD = "로컬비밀번호"
 $env:JWT_SECRET = "32바이트이상의로컬개발용JWT시크릿값"
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+
+로컬 설정 파일을 사용하면 환경변수 입력을 생략할 수 있습니다.
+
+```powershell
+copy backend\config\application-local.example.yml backend\config\application-local.yml
+notepad backend\config\application-local.yml
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+
+기존 H2 file DB로 실행해야 할 때만 `h2` profile을 지정합니다.
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "h2"
 cd backend
 .\mvnw.cmd spring-boot:run
 ```
@@ -178,16 +199,16 @@ cd backend
 
 - 운영 profile 정리
 - `JWT_SECRET` 외부 설정
-- MySQL 실연결 테스트
+- MySQL 실사용 흐름 테스트
 - DB 백업/복구 절차
 - H2 사용 시 데이터 보존/백업 정책
 
 ## 다음 마일스톤
 
-1. 배포 방식 확정
-2. MySQL 실연결 테스트
+1. MySQL DB 생성 및 로컬 실사용 흐름 테스트
+2. H2 기존 데이터 MySQL 이관 방식 결정
 3. DB 백업/복구 절차 작성
-4. 운영용 실행 스크립트 또는 profile 정리
+4. 배포 방식 확정
 5. 저장된 병합 결과 운영 흐름 점검
 6. CSV edge case 추가 테스트
 

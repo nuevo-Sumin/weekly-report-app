@@ -9,7 +9,7 @@
 - 기술 스택:
   - Backend: Spring Boot, Spring Security, JWT, JPA
   - Frontend: React + Vite
-  - DB: 기본 H2 file DB, MySQL profile 준비
+  - DB: 기본 MySQL, H2 file DB fallback profile
 - 저장소/원격: GitHub `weekly-report-app`
 - 현재 주요 브랜치:
   - `main`
@@ -64,11 +64,12 @@ git status --short --branch
 
 ## DB 상태
 
-- 기본 DB: H2 file DB
-- 위치: `./data/weekly_report` (백엔드를 `backend/`에서 실행해도 루트 `data/`를 사용)
-- `data/` 폴더를 삭제하지 않으면 서버 재시작 후에도 데이터 유지
+- 기본 DB: MySQL
 - MySQL profile: `backend/src/main/resources/application-mysql.yml`
-- MySQL 실연결 테스트는 아직 남은 작업
+- H2 fallback profile: `backend/src/main/resources/application-h2.yml`
+- H2 위치: `./data/weekly_report` (백엔드를 `backend/`에서 실행해도 루트 `data/`를 사용)
+- `SPRING_PROFILES_ACTIVE=h2`를 지정하면 기존 H2 file DB로 실행 가능
+- MySQL 실사용 흐름 테스트는 아직 남은 작업
 - H2 데이터를 MySQL로 이관하는 자동 스크립트는 아직 없음
 
 ## 프론트/백엔드 서빙 구조
@@ -110,6 +111,7 @@ cd ..\backend
 
 - `backend/src/main/resources/application.yml`
 - `backend/src/main/resources/application-mysql.yml`
+- `backend/src/main/resources/application-h2.yml`
 - `backend/src/main/java/com/metabuild/weeklyreport/security/*`
 - `backend/src/main/java/com/metabuild/weeklyreport/auth/*`
 - `backend/src/main/java/com/metabuild/weeklyreport/reportitem/*`
@@ -183,13 +185,12 @@ cd ..\backend
 
 ## 남은 주요 마일스톤
 
-1. 배포 전략 확정
-2. 운영 profile 또는 실행 스크립트 정리
-3. MySQL 실연결 테스트
-4. H2 데이터 MySQL 이관 방식 결정
-5. DB 백업/복구 절차 작성
-6. CSV edge case 추가 테스트
-7. 저장된 병합 결과 운영 흐름 점검
+1. MySQL DB 생성 및 로컬 실사용 흐름 테스트
+2. H2 데이터 MySQL 이관 방식 결정
+3. DB 백업/복구 절차 작성
+4. 배포 전략 확정
+5. CSV edge case 추가 테스트
+6. 저장된 병합 결과 운영 흐름 점검
 
 ## 작업 시 주의사항
 

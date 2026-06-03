@@ -3,6 +3,8 @@ frontend/dist/
 target/
 .idea/
 data/
+backend/config/application-local.yml
+backend/scripts/init-mysql.sql
 *.db
 *.mv.db
 *.trace.db

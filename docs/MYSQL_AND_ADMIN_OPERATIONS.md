@@ -1,23 +1,25 @@
 # MySQL 전환 준비 및 관리자 승인 운영
 
-이 문서는 로컬 H2 file DB를 유지하면서, 이후 MySQL로 전환할 때 필요한 최소 설정과 MVP 단계의 관리자 승인 운영 방법을 정리한다.
+이 문서는 기본 DB를 MySQL로 운영하기 위한 설정과, H2 file DB fallback 및 MVP 단계의 관리자 승인 운영 방법을 정리한다.
 
 ## 1. 현재 DB 운영 방식
 
-기본 실행은 H2 file DB를 사용한다.
+기본 실행은 `mysql` profile을 사용한다. `backend/src/main/resources/application.yml`에서 기본 profile이 `mysql`로 지정되어 있으므로 별도 `SPRING_PROFILES_ACTIVE`를 주지 않으면 MySQL로 연결한다.
+
+MySQL 설정 파일:
+
+- `backend/src/main/resources/application-mysql.yml`
+
+H2 file DB는 기존 데이터 확인이나 임시 fallback이 필요할 때만 `h2` profile로 실행한다.
 
 - DB 파일 위치: `./data/weekly_report`
 - JDBC URL: `jdbc:h2:file:../data/weekly_report;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE` (`backend/`에서 실행할 때 루트 `data/`를 사용)
 - 서버를 꺼도 `data/` 폴더를 지우지 않으면 회원/보고 데이터가 유지된다.
 - `data/` 폴더는 `.gitignore`에 포함되어 GitHub에 올라가지 않는다.
 
-## 2. MySQL profile
+## 2. MySQL 설정
 
-MySQL 전환을 위해 `mysql` Spring profile을 추가했다.
-
-설정 파일:
-
-- `backend/src/main/resources/application-mysql.yml`
+MySQL profile은 기본 활성화된다.
 
 사용 환경변수:
 
@@ -28,6 +30,8 @@ MySQL 전환을 위해 `mysql` Spring profile을 추가했다.
 - `JWT_SECRET`: 운영/공유 환경에서 사용할 32바이트 이상 JWT secret
 - `JWT_EXPIRATION`: access token 만료 시간(ms)
 
+환경변수 대신 로컬 전용 설정 파일을 사용할 수도 있다. `backend/config/application-local.example.yml`을 `backend/config/application-local.yml`로 복사하고, MySQL 사용자 비밀번호와 JWT secret을 적는다. `application-local.yml`은 Git에 커밋하지 않는다. IntelliJ 실행 위치가 프로젝트 루트이든 `backend/`이든 이 파일을 읽도록 설정되어 있다.
+
 기본 JDBC URL은 로컬 개발 편의를 위한 값이다.
 
 ```text
@@ -37,6 +41,7 @@ jdbc:mysql://localhost:3306/weekly_report?useSSL=false&allowPublicKeyRetrieval=t
 ## 3. 로컬 MySQL 준비 예시
 
 MySQL에 접속해 DB와 사용자를 만든다. 비밀번호는 실제 로컬 값으로 바꿔서 실행한다.
+같은 내용의 템플릿은 `backend/scripts/init-mysql.example.sql`에도 있다. 실제 비밀번호를 넣은 `backend/scripts/init-mysql.sql`은 로컬 전용으로 만들고 Git에 커밋하지 않는다.
 
 ```sql
 CREATE DATABASE weekly_report
@@ -48,10 +53,9 @@ GRANT ALL PRIVILEGES ON weekly_report.* TO 'weekly_report'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-PowerShell에서 MySQL profile로 실행한다.
+PowerShell에서 MySQL로 실행한다.
 
 ```powershell
-$env:SPRING_PROFILES_ACTIVE = "mysql"
 $env:MYSQL_USER = "weekly_report"
 $env:MYSQL_PASSWORD = "로컬비밀번호"
 $env:JWT_SECRET = "32바이트이상의로컬개발용JWT시크릿값을넣으세요"
@@ -59,10 +63,27 @@ cd backend
 .\mvnw.cmd spring-boot:run
 ```
 
+로컬 설정 파일로 실행할 때는 다음처럼 준비한다.
+
+```powershell
+copy backend\config\application-local.example.yml backend\config\application-local.yml
+notepad backend\config\application-local.yml
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+
 IntelliJ IDEA에서는 Run Configuration의 Environment variables에 다음 값을 추가한다.
 
 ```text
-SPRING_PROFILES_ACTIVE=mysql;MYSQL_USER=weekly_report;MYSQL_PASSWORD=로컬비밀번호;JWT_SECRET=32바이트이상의로컬개발용JWT시크릿값
+MYSQL_USER=weekly_report;MYSQL_PASSWORD=로컬비밀번호;JWT_SECRET=32바이트이상의로컬개발용JWT시크릿값
+```
+
+기존 H2 file DB로 실행해야 할 때는 다음처럼 profile을 명시한다.
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "h2"
+cd backend
+.\mvnw.cmd spring-boot:run
 ```
 
 ## 4. H2에서 MySQL로 옮길 때 주의점
@@ -70,7 +91,7 @@ SPRING_PROFILES_ACTIVE=mysql;MYSQL_USER=weekly_report;MYSQL_PASSWORD=로컬비�
 MVP 단계에서는 Flyway/Liquibase 마이그레이션을 아직 사용하지 않는다. 따라서 MySQL 첫 전환 시에는 다음 순서를 권장한다.
 
 1. MySQL DB를 빈 상태로 만든다.
-2. `SPRING_PROFILES_ACTIVE=mysql`로 앱을 한 번 실행해 JPA가 테이블을 생성하게 한다.
+2. 기본 실행으로 앱을 한 번 실행해 JPA가 테이블을 생성하게 한다.
 3. 회원가입, 로그인, 업무 항목 저장, 팀장 조회, 병합 저장을 수동 테스트한다.
 4. 실사용 전에는 `JPA_DDL_AUTO=validate` 또는 명시적 SQL 마이그레이션 도입을 검토한다.
 
