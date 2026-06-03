@@ -69,8 +69,8 @@ git status --short --branch
 - H2 fallback profile: `backend/src/main/resources/application-h2.yml`
 - H2 위치: `./data/weekly_report` (백엔드를 `backend/`에서 실행해도 루트 `data/`를 사용)
 - `SPRING_PROFILES_ACTIVE=h2`를 지정하면 기존 H2 file DB로 실행 가능
-- MySQL 실사용 흐름 테스트는 아직 남은 작업
-- H2 데이터를 MySQL로 이관하는 자동 스크립트는 아직 없음
+- MySQL 실사용 흐름 테스트 완료
+- 기존 H2 데이터는 MySQL로 이관하지 않음
 
 ## 프론트/백엔드 서빙 구조
 
@@ -185,12 +185,10 @@ cd ..\backend
 
 ## 남은 주요 마일스톤
 
-1. MySQL DB 생성 및 로컬 실사용 흐름 테스트
-2. H2 데이터 MySQL 이관 방식 결정
-3. DB 백업/복구 절차 작성
-4. 배포 전략 확정
-5. CSV edge case 추가 테스트
-6. 저장된 병합 결과 운영 흐름 점검
+1. DB 백업/복구 절차 작성
+2. 배포 전략 확정
+3. CSV edge case 추가 테스트
+4. 저장된 병합 결과 운영 흐름 점검
 
 ## 작업 시 주의사항
 

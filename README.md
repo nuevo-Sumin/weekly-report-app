@@ -52,6 +52,7 @@ PL 권한은 MVP 단계에서 자동 승인하지 않습니다. 회원가입 시
 - 기본 profile은 `mysql`이며, 연결 정보는 `MYSQL_URL`, `MYSQL_USER`, `MYSQL_PASSWORD` 환경변수로 지정한다.
 - 기존 H2 file DB는 `h2` profile로 남겨 둔다.
 - H2 DB 위치: `./data/weekly_report` (백엔드를 `backend/`에서 실행해도 루트 `data/`를 사용)
+- 기존 H2 데이터는 MySQL로 이관하지 않는다.
 - MySQL 운영 이관 전에는 DB 생성, 회원가입, 로그인, 보고 저장, PL 취합 수동 테스트가 필요하다.
 
 ## 실행 방법
@@ -201,16 +202,14 @@ cd backend
 - `JWT_SECRET` 외부 설정
 - MySQL 실사용 흐름 테스트
 - DB 백업/복구 절차
-- H2 사용 시 데이터 보존/백업 정책
+- H2는 기존 데이터 확인용 fallback으로만 사용
 
 ## 다음 마일스톤
 
-1. MySQL DB 생성 및 로컬 실사용 흐름 테스트
-2. H2 기존 데이터 MySQL 이관 방식 결정
-3. DB 백업/복구 절차 작성
-4. 배포 방식 확정
-5. 저장된 병합 결과 운영 흐름 점검
-6. CSV edge case 추가 테스트
+1. MySQL 운영 데이터 백업/복구 절차 작성
+2. 배포 방식 확정
+3. 저장된 병합 결과 운영 흐름 점검
+4. CSV edge case 추가 테스트
 
 ## 관련 문서
 

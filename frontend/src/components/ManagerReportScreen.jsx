@@ -238,16 +238,16 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
             <p className="panel-label">팀장 취합 화면</p>
             <h2>개발자 제출 내용 조회</h2>
           </div>
+          <div className="inline-period" aria-label="보고 기간">
+            <span>보고 기간</span>
+            <strong>{formatDate(weekRange.startDate)} ~ {formatDate(weekRange.endDate)}</strong>
+          </div>
           <button className="secondary-button" type="button" onClick={() => loadSubmittedItems()} disabled={isLoading}>
             새로고침
           </button>
         </div>
 
         <form className="filter-grid" onSubmit={handleSearch}>
-          <div className="readonly-box">
-            <span>보고 기간</span>
-            <strong>{formatDate(weekRange.startDate)} ~ {formatDate(weekRange.endDate)}</strong>
-          </div>
           <label>
             개발자 아이디
             <input

@@ -243,6 +243,25 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
+.inline-period {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--olive);
+  white-space: nowrap;
+}
+
+.inline-period span {
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.inline-period strong {
+  font-weight: 800;
+}
+
 .check-label {
   display: flex !important;
   grid-template-columns: auto 1fr;
@@ -847,6 +866,10 @@ textarea:focus {
   .user-tools {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .inline-period {
+    margin-left: 0;
   }
 }
 

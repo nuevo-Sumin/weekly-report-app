@@ -549,16 +549,13 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <p className="panel-label">개발자 제출 화면</p>
             <h2>업무 항목 입력</h2>
           </div>
-          <button className="secondary-button" type="button" onClick={loadReportItems}>
-            새로고침
-          </button>
-        </div>
-
-        <div className="period-grid auto-period-grid">
-          <div className="readonly-box">
+          <div className="inline-period" aria-label="보고 기간">
             <span>보고 기간</span>
             <strong>{formatDate(weekRange.startDate)} ~ {formatDate(weekRange.endDate)}</strong>
           </div>
+          <button className="secondary-button" type="button" onClick={loadReportItems}>
+            새로고침
+          </button>
         </div>
 
         <div className="input-mode-tabs" aria-label="업무 입력 방식 선택">
