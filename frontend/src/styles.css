@@ -4,12 +4,12 @@
   --olive: #6B705C;
   --sage: #A5A58D;
   --stone: #B7B7A4;
-  --linen: #FFE8D6;
+  --linen: #fffdf6;
   --clay: #CB997E;
-  --panel: #fffaf4;
-  --table-row: #fffaf4;
+  --panel: #fffefa;
+  --table-row: #fffefa;
   --muted-text: #6B705C;
-  --soft-surface: #FFE8D6;
+  --soft-surface: #fff7ec;
   color: var(--olive);
   background: var(--linen);
   font-family: "Gowun Dodum", "고운돋움", "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
@@ -360,7 +360,7 @@ textarea:focus {
 
 .report-layout {
   display: grid;
-  grid-template-columns: minmax(360px, 0.9fr) minmax(520px, 1.25fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
