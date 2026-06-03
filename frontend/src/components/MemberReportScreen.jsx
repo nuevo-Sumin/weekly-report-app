@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildIssueUrl, categoryLabels, csvWeekSelectionLabels, initialReportForm, statusLabels, weekTypeLabels } from '../constants';
+import {
+  buildIssueUrl,
+  categoryLabels,
+  compareReportItemsByUnitTask,
+  csvWeekSelectionLabels,
+  initialReportForm,
+  normalizeReportItemUnitTask,
+  normalizeUnitTaskName,
+  statusLabels,
+  weekTypeLabels,
+} from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
 import { buildPreview, formatReportItemDueLabel } from '../reportPreview';
 import { requestApi } from '../api';
@@ -24,6 +34,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [csvValidationResults, setCsvValidationResults] = useState([]);
   const [csvSaveResults, setCsvSaveResults] = useState([]);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [csvExcludedOpen, setCsvExcludedOpen] = useState(false);
   const [copySucceeded, setCopySucceeded] = useState(false);
 
   const weekRange = useMemo(() => getWeekRange(today), [today]);
@@ -38,7 +49,9 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const allCsvRowsSelected = csvRows.length > 0 && selectedCsvRowCount === csvRows.length;
   const csvSaveSuccessCount = useMemo(() => csvSaveResults.filter((result) => result.status === 'success').length, [csvSaveResults]);
   const csvSaveFailureCount = useMemo(() => csvSaveResults.filter((result) => result.status === 'error').length, [csvSaveResults]);
-  const csvCompletedExcludedCount = useMemo(() => csvValidationResults.filter((result) => result.status === 'warning').length, [csvValidationResults]);
+  const csvCompletedExcludedResults = useMemo(() => csvValidationResults.filter((result) => result.status === 'warning'), [csvValidationResults]);
+  const csvValidationErrorResults = useMemo(() => csvValidationResults.filter((result) => result.status !== 'warning'), [csvValidationResults]);
+  const csvCompletedExcludedCount = csvCompletedExcludedResults.length;
 
   useEffect(() => {
     if (token) {
@@ -104,6 +117,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setCsvValidationResults([]);
     setCsvSaveResults([]);
     setCsvModalOpen(false);
+    setCsvExcludedOpen(false);
   }
 
   function clearCurrentWork() {
@@ -187,6 +201,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         ];
         setCsvValidationResults(validationResults);
         setCsvSaveResults([]);
+        setCsvExcludedOpen(false);
         setCsvModalOpen(true);
         const errorNotice = validationResults.length > 0 ? ` 오류/제외 ${validationResults.length}건은 목록에서 제외했습니다.` : '';
         if (periodFiltered.rows.length === 0 && validationResults.length > 0) {
@@ -200,6 +215,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         setCsvValidationResults([]);
         setCsvSaveResults([]);
         setCsvModalOpen(false);
+        setCsvExcludedOpen(false);
         setMessage(error.message);
       } finally {
         event.target.value = '';
@@ -362,13 +378,16 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         method: 'GET',
         token,
       });
-      setItems(data);
-      setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id && item.saveStatus === 'SAVED')));
+      const normalizedItems = data
+        .map(normalizeReportItemUnitTask)
+        .sort(compareReportItemsByUnitTask);
+      setItems(normalizedItems);
+      setSelectedIds((current) => current.filter((id) => normalizedItems.some((item) => item.id === id && item.saveStatus === 'SAVED')));
       setMergedReportId(null);
       setMergedText(null);
       setMergedReportStatus(null);
       setIsMergedReportEditing(true);
-      return data;
+      return normalizedItems;
     } catch (error) {
       setMessage(error.message);
       return [];
@@ -419,7 +438,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         reportEndDate: weekRange.endDate,
         weekType: reportForm.weekType,
         category: reportForm.category,
-        unitTask: reportForm.category === 'BUSINESS_MANAGEMENT' ? '사업관리' : reportForm.unitTask,
+        unitTask: reportForm.category === 'BUSINESS_MANAGEMENT' ? '사업관리' : normalizeUnitTaskName(reportForm.unitTask),
         title: reportForm.title,
         detailContent,
         progressContent: reportForm.progressContent?.trim() || reportForm.title,
@@ -786,14 +805,13 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                       <th scope="col">세부사항</th>
                       <th scope="col">상태</th>
                       <th scope="col">완료예정</th>
-                      <th scope="col">완료일</th>
                       <th scope="col">완료기한</th>
                     </tr>
                   </thead>
                   <tbody>
                     {csvRows.length === 0 ? (
                       <tr>
-                        <td className="empty-state" colSpan="9">저장 가능한 CSV 행이 없습니다.</td>
+                        <td className="empty-state" colSpan="8">저장 가능한 CSV 행이 없습니다.</td>
                       </tr>
                     ) : csvRows.map((row) => (
                       <tr key={row.tempId}>
@@ -831,7 +849,6 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                         <td className="csv-title-cell" title={row.title}>{row.title}</td>
                         <td>{statusLabels[row.status]}</td>
                         <td>{formatReportItemDueLabel(row) || '-'}</td>
-                        <td>{row.completedDate || '-'}</td>
                         <td>{row.dueDate || '-'}</td>
                       </tr>
                     ))}
@@ -840,19 +857,42 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               </div>
 
               {csvValidationResults.length > 0 && (
-                <div className="csv-result-list csv-modal-results" role="status" aria-live="polite" aria-label="CSV 검증 결과">
-                  {csvValidationResults.map((result) => (
-                    <p key={result.key} className={`csv-result ${result.status}`}>
-                      <span>{result.status === 'warning' ? '제외' : '검증 오류'}</span>
-                      <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
-                      <span>{result.title}</span>
-                      <span>
-                        {result.status === 'warning'
-                          ? `기존 완료건 · 완료일 ${result.completedDate || '-'}`
-                          : result.message}
-                      </span>
-                    </p>
-                  ))}
+                <div className="csv-modal-results" aria-label="CSV 검증 결과">
+                  {csvCompletedExcludedCount > 0 && (
+                    <>
+                      <button
+                        className="csv-results-toggle"
+                        type="button"
+                        onClick={() => setCsvExcludedOpen((current) => !current)}
+                        aria-expanded={csvExcludedOpen}
+                      >
+                        <span>제외된 기존 완료건 {csvCompletedExcludedCount}건</span>
+                        <strong>{csvExcludedOpen ? '접기' : '펼치기'}</strong>
+                      </button>
+                      {csvExcludedOpen && (
+                        <div className="csv-result-list" role="status" aria-live="polite">
+                          {csvCompletedExcludedResults.map((result) => (
+                            <p key={result.key} className={`csv-result ${result.status}`}>
+                              <span className="csv-result-badge">제외</span>
+                              <span className="csv-result-title">{result.title}</span>
+                              <span className="csv-result-detail">기존 완료건 · 완료일 {result.completedDate || '-'}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {csvValidationErrorResults.length > 0 && (
+                    <div className="csv-result-list" role="status" aria-live="polite">
+                      {csvValidationErrorResults.map((result) => (
+                        <p key={result.key} className={`csv-result ${result.status}`}>
+                          <span className="csv-result-badge">검증 오류</span>
+                          <span className="csv-result-title">{result.title}</span>
+                          <span className="csv-result-detail">{result.message}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -96,6 +96,23 @@ const mixedCsv = [
 }
 
 {
+  const skippedOrderCsv = [
+    '#,제목,상태,범주,진척도,완료기한,완료일',
+    '1,오래된 완료,완료,공통,100,2026-05-20,2026-05-20',
+    '2,최신 완료,완료,공통,100,2026-06-03,2026-06-03',
+    '3,중간 완료,완료,공통,100,2026-05-27,2026-05-27',
+  ].join('\n');
+
+  const parsed = parseReportCsvWithErrors(skippedOrderCsv);
+  const result = filterCsvRowsForReportPeriod(parsed.rows, {
+    startDate: '2026-05-28',
+    endDate: '2026-05-30',
+  });
+
+  assert.deepEqual(result.skipped.map((row) => row.title), ['최신 완료', '중간 완료', '오래된 완료']);
+}
+
+{
   const invalidCompletedDateCsv = [
     '#,제목,상태,범주,진척도,완료일',
     '1,완료일 오류,완료,공통,100,2026년 5월 27일',
@@ -111,9 +128,44 @@ const mixedCsv = [
     '#,제목,상태,범주,진척도',
     '1,개인정보 업무,진행중,개인정보보호,10',
     '2,연계 업무,진행중,연계,10',
-    '3,학교밖 업무,진행중,학교밖청소년지원센터,10',
+    '3,상담 업무,진행중,청상복,10',
+    '4,학교밖 업무,진행중,학교밖,10',
+    '5,가정밖 업무,진행중,쉼터,10',
+    '6,보호치료 업무,진행중,디딤센터,10',
   ].join('\n');
   const result = parseReportCsvWithErrors(unitTaskMappedCsv);
 
-  assert.deepEqual(result.rows.map((row) => row.unitTask), ['공통', '공통', '학교밖청소년지원센터']);
+  assert.deepEqual(result.rows.map((row) => row.unitTask), [
+    '공통',
+    '공통',
+    '청소년상담복지센터(디지털과의존대응부)',
+    '학교밖청소년지원센터',
+    '가정밖청소년지원부(쉼터/자립/회복)',
+    '청소년보호치료센터',
+  ]);
+}
+
+{
+  const unorderedCsv = [
+    '#,제목,상태,범주,진척도,완료기한',
+    '1,보호치료 업무,진행중,청소년보호치료센터,10,2026-06-05',
+    '2,공통 업무,진행중,개인정보,50,2026-06-02',
+    '3,학교밖 업무,진행중,학교밖,10,2026-06-03',
+    '4,상담 업무,진행중,청소년상담복지센터,10,2026-06-01',
+    '5,가정밖 업무,진행중,가정밖,10,2026-06-04',
+  ].join('\n');
+
+  const parsed = parseReportCsvWithErrors(unorderedCsv);
+  const result = filterCsvRowsForReportPeriod(parsed.rows, {
+    startDate: '2026-06-01',
+    endDate: '2026-06-05',
+  });
+
+  assert.deepEqual(result.rows.map((row) => row.unitTask), [
+    '공통',
+    '청소년상담복지센터(디지털과의존대응부)',
+    '학교밖청소년지원센터',
+    '가정밖청소년지원부(쉼터/자립/회복)',
+    '청소년보호치료센터',
+  ]);
 }

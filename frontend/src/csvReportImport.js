@@ -1,3 +1,5 @@
+import { compareUnitTasks, normalizeUnitTaskName } from './constants.js';
+
 const headerAliases = {
   sourceKey: ['#', 'ID', '아이디'],
   unitTask: ['범주', '단위업무'],
@@ -127,11 +129,7 @@ function parseCompleted(rawCompleted, status, progressRate) {
 }
 
 function normalizeCsvUnitTask(rawUnitTask) {
-  const unitTask = String(rawUnitTask ?? '').trim();
-  if (!unitTask) {
-    return '미분류';
-  }
-  return ['개인정보보호', '연계'].includes(unitTask) ? '공통' : unitTask;
+  return normalizeUnitTaskName(rawUnitTask);
 }
 
 function parseDateField(rawDate, rowNumber, fieldLabel) {
@@ -261,10 +259,14 @@ export function filterCsvRowsForReportPeriod(rows, weekRange) {
     NEW: 3,
   };
   filtered.rows.sort((first, second) => (
-    first.unitTask.localeCompare(second.unitTask, 'ko')
+    compareUnitTasks(first.unitTask, second.unitTask)
     || (statusOrder[first.status] ?? 99) - (statusOrder[second.status] ?? 99)
     || String(first.dueDate || '9999-12-31').localeCompare(String(second.dueDate || '9999-12-31'))
     || first.sourceRowNumber - second.sourceRowNumber
+  ));
+  filtered.skipped.sort((first, second) => (
+    String(second.completedDate || '0000-00-00').localeCompare(String(first.completedDate || '0000-00-00'))
+    || first.lineNumber - second.lineNumber
   ));
 
   return filtered;

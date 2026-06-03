@@ -1,23 +1,24 @@
 @import url("https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap");
 
 :root {
-  --olive: #0D5FA6;
-  --sage: #4494A6;
-  --stone: #C4E1F2;
-  --linen: #F4F9FD;
-  --input-pattern-line: rgba(68, 148, 166, 0.16);
-  --csv-pattern-line: rgba(68, 148, 166, 0.16);
-  --clay: #147DD9;
+  --olive: #588C73;
+  --sage: #588C73;
+  --stone: #E7C78E;
+  --linen: #FBF7EF;
+  --input-pattern-line: rgba(88, 140, 115, 0.12);
+  --csv-pattern-line: rgba(140, 70, 70, 0.12);
+  --clay: #EEA36E;
   --panel: #ffffff;
-  --table-row: #ffffff;
-  --muted-text: #2B7F93;
-  --soft-surface: #EEF7FC;
-  --notice-surface: #E6F4FB;
-  --button-surface: #F0F8FC;
-  --accent-surface: #D9EDF8;
-  --csv-surface: #D9EDF8;
-  --green: #135908;
-  --green-surface: #EFF8EE;
+  --table-row: #FFFDF8;
+  --muted-text: #7B5B4D;
+  --soft-surface: #FFF8EA;
+  --notice-surface: #FFF4DE;
+  --button-surface: #FFF8EA;
+  --accent-surface: #F6D394;
+  --csv-surface: #F6D394;
+  --green: #8C4646;
+  --green-surface: #FCEDEA;
+  --danger: #D96459;
   color: var(--olive);
   background: var(--linen);
   font-family: "Gowun Dodum", "고운돋움", "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
@@ -68,7 +69,7 @@ button {
   border: 1px solid var(--stone);
   border-radius: 8px;
   background: var(--panel);
-  box-shadow: 0 18px 42px rgba(13, 95, 166, 0.14);
+  box-shadow: 0 16px 34px rgba(88, 57, 45, 0.12);
 }
 
 .auth-panel {
@@ -237,7 +238,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--clay);
-  outline: 3px solid rgba(20, 125, 217, 0.22);
+  outline: 3px solid rgba(238, 163, 110, 0.28);
 }
 
 .wide-field {
@@ -329,7 +330,8 @@ textarea:focus {
 
 .primary-button:hover,
 .auth-tabs button.active:hover {
-  background: var(--clay);
+  border-color: #3f705a;
+  background: #3f705a;
 }
 
 .primary-button:disabled,
@@ -350,14 +352,14 @@ textarea:focus {
 }
 
 .danger-button {
-  border-color: var(--green);
+  border-color: var(--danger);
   background: var(--green-surface);
   color: var(--green);
 }
 
 .danger-button:hover {
   border-color: var(--green);
-  background: #E1F2DF;
+  background: #F9DAD5;
 }
 
 .primary-button.compact,
@@ -409,7 +411,7 @@ textarea:focus {
 
 .panel-label {
   margin: 0 0 4px;
-  color: var(--clay);
+  color: var(--green);
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -551,11 +553,80 @@ textarea:focus {
 
 .csv-items-table {
   min-width: 1160px;
+  table-layout: fixed;
 }
 
 .csv-items-table select {
-  min-width: 110px;
+  width: 78px;
+  min-width: 78px;
   min-height: 42px;
+  padding: 8px 28px 8px 10px;
+}
+
+.csv-items-table th,
+.csv-items-table td {
+  text-align: left;
+}
+
+.csv-items-table th {
+  text-align: center;
+}
+
+.csv-items-table th:first-child,
+.csv-items-table td:first-child {
+  width: 30px;
+  padding-right: 2px;
+  padding-left: 2px;
+  text-align: center;
+}
+
+.csv-items-table th:nth-child(6),
+.csv-items-table td:nth-child(6) {
+  width: 66px;
+  min-width: 66px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.csv-items-table th:nth-child(2),
+.csv-items-table td:nth-child(2) {
+  width: 88px;
+}
+
+.csv-items-table th:nth-child(3),
+.csv-items-table td:nth-child(3) {
+  width: 66px;
+  text-align: center;
+}
+
+.csv-items-table th:nth-child(4),
+.csv-items-table td:nth-child(4) {
+  width: 10em;
+  max-width: 10em;
+}
+
+.csv-items-table td:nth-child(4) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.csv-items-table th:nth-child(7),
+.csv-items-table td:nth-child(7),
+.csv-items-table th:nth-child(8),
+.csv-items-table td:nth-child(8) {
+  width: 126px;
+  white-space: nowrap;
+}
+
+.csv-items-table th:nth-child(7),
+.csv-items-table th:nth-child(8) {
+  text-align: center;
+}
+
+.csv-items-table td:nth-child(7),
+.csv-items-table td:nth-child(8) {
+  text-align: center;
 }
 
 .csv-result-list {
@@ -586,12 +657,25 @@ textarea:focus {
   white-space: nowrap;
 }
 
-.csv-result span:nth-child(3) {
-  flex: 1 1 auto;
+.csv-result-badge {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #FFFDF8;
+  color: var(--green);
 }
 
-.csv-result span:last-child {
-  flex: 0 1 auto;
+.csv-result-title {
+  flex: 1 1 auto;
+  display: -webkit-box;
+  white-space: normal !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+
+.csv-result-detail {
+  flex: 0 1 240px;
   color: var(--muted-text);
 }
 
@@ -600,7 +684,7 @@ textarea:focus {
 }
 
 .csv-result.error {
-  border-color: var(--clay);
+  border-color: var(--danger);
   color: var(--olive);
 }
 
@@ -629,7 +713,7 @@ textarea:focus {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(13, 95, 166, 0.38);
+  background: rgba(88, 140, 115, 0.36);
 }
 
 .csv-modal {
@@ -641,7 +725,7 @@ textarea:focus {
   border: 1px solid var(--stone);
   border-radius: 8px;
   background: var(--panel);
-  box-shadow: 0 24px 60px rgba(13, 95, 166, 0.22);
+  box-shadow: 0 24px 60px rgba(88, 57, 45, 0.18);
 }
 
 .csv-modal-header,
@@ -684,12 +768,38 @@ textarea:focus {
 }
 
 .csv-modal-results {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 2px solid var(--green);
+}
+
+.csv-results-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--stone);
+  border-radius: 6px;
+  background: var(--button-surface);
+  color: var(--green);
+  text-align: left;
+  font-weight: 800;
+}
+
+.csv-results-toggle strong {
+  color: var(--olive);
+  font-size: 0.88rem;
+}
+
+.csv-modal-results .csv-result-list {
   max-height: 160px;
   overflow: auto;
 }
 
 .csv-title-cell {
-  max-width: 360px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -776,7 +886,15 @@ textarea:focus {
 }
 
 .table-check {
+  width: 100%;
+  gap: 0 !important;
   justify-content: center;
+}
+
+.csv-items-table .table-check input {
+  width: 14px;
+  min-height: 14px;
+  margin: 0;
 }
 
 .empty-state {

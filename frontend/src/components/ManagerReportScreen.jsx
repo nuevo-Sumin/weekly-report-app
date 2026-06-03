@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildIssueUrl, categoryLabels, statusLabels, weekTypeLabels } from '../constants';
+import {
+  buildIssueUrl,
+  categoryLabels,
+  compareReportItemsByUnitTask,
+  normalizeReportItemUnitTask,
+  statusLabels,
+  weekTypeLabels,
+} from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
 import { buildAdminPreview, formatReportItemDueLabel } from '../reportPreview';
 import { requestApi } from '../api';
@@ -77,8 +84,11 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       if (requestId !== latestRequestId.current) {
         return;
       }
-      setItems(data);
-      setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id)));
+      const normalizedItems = data
+        .map(normalizeReportItemUnitTask)
+        .sort(compareReportItemsByUnitTask);
+      setItems(normalizedItems);
+      setSelectedIds((current) => current.filter((id) => normalizedItems.some((item) => item.id === id)));
       setMergedText(null);
       setMergedReportId(null);
       setCopySucceeded(false);

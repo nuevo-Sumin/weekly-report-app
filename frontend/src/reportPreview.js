@@ -1,4 +1,4 @@
-import { statusLabels, weekTypeLabels } from './constants';
+import { compareUnitTasks, statusLabels, weekTypeLabels, normalizeUnitTaskName } from './constants.js';
 
 const weekOrder = ['THIS_WEEK', 'NEXT_WEEK'];
 
@@ -26,8 +26,7 @@ function buildTitleLine(item) {
 }
 
 function normalizeUnitTask(unitTask) {
-  const normalized = String(unitTask || '미분류').trim();
-  return ['개인정보보호', '연계'].includes(normalized) ? '공통' : normalized;
+  return normalizeUnitTaskName(unitTask);
 }
 
 function normalizeContentLine(line) {
@@ -102,7 +101,8 @@ function buildWeekSection(weekType, items) {
   const weeklyItems = items.filter((item) => item.weekType === weekType);
   const businessItems = weeklyItems.filter((item) => item.category === 'BUSINESS_MANAGEMENT');
   const executionItems = weeklyItems.filter((item) => item.category !== 'BUSINESS_MANAGEMENT');
-  const executionGroups = Object.entries(groupByUnitTask(executionItems));
+  const executionGroups = Object.entries(groupByUnitTask(executionItems))
+    .sort(([firstUnitTask], [secondUnitTask]) => compareUnitTasks(firstUnitTask, secondUnitTask));
   const lines = [
     `[${weekTypeLabels[weekType]}]`,
     '',
