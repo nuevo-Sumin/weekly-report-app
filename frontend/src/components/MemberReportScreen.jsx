@@ -16,6 +16,8 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const [reportForm, setReportForm] = useState(initialReportForm);
   const [mergedReportId, setMergedReportId] = useState(null);
   const [mergedText, setMergedText] = useState(null);
+  const [mergedReportStatus, setMergedReportStatus] = useState(null);
+  const [isMergedReportEditing, setIsMergedReportEditing] = useState(true);
   const [savedMergedReports, setSavedMergedReports] = useState([]);
   const [csvRows, setCsvRows] = useState([]);
   const [csvFileName, setCsvFileName] = useState('');
@@ -27,13 +29,16 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const weekRange = useMemo(() => getWeekRange(today), [today]);
   const previewText = useMemo(() => buildPreview(items, selectedIds), [items, selectedIds]);
   const activeMergedText = mergedText ?? previewText;
+  const isFinalMergedReport = mergedReportStatus === 'FINAL';
+  const isFinalMergedReportLocked = isFinalMergedReport && !isMergedReportEditing;
+  const canPersistMergedReport = (mergedReportId || selectedIds.length > 0) && activeMergedText.trim() && !isLoading;
   const isPendingManager = user.requestedRole === 'MANAGER' && user.roleApprovalStatus === 'PENDING';
-  const savedItemCount = useMemo(() => items.filter((item) => item.saveStatus === 'SAVED').length, [items]);
-  const selectableItemIds = useMemo(() => items.filter((item) => item.saveStatus === 'SAVED').map((item) => item.id), [items]);
-  const allSelectableItemsSelected = selectableItemIds.length > 0 && selectableItemIds.every((id) => selectedIds.includes(id));
   const selectedCsvRowCount = useMemo(() => csvRows.filter((row) => row.selected).length, [csvRows]);
   const hasCsvImportState = csvRows.length > 0 || csvValidationResults.length > 0 || csvSaveResults.length > 0;
   const allCsvRowsSelected = csvRows.length > 0 && selectedCsvRowCount === csvRows.length;
+  const csvSaveSuccessCount = useMemo(() => csvSaveResults.filter((result) => result.status === 'success').length, [csvSaveResults]);
+  const csvSaveFailureCount = useMemo(() => csvSaveResults.filter((result) => result.status === 'error').length, [csvSaveResults]);
+  const csvCompletedExcludedCount = useMemo(() => csvValidationResults.filter((result) => result.status === 'warning').length, [csvValidationResults]);
 
   useEffect(() => {
     if (token) {
@@ -101,13 +106,29 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setCsvModalOpen(false);
   }
 
+  function clearCurrentWork() {
+    clearCsvImport();
+    setSelectedIds([]);
+    setReportForm(initialReportForm);
+    setMergedReportId(null);
+    setMergedText(null);
+    setMergedReportStatus(null);
+    setIsMergedReportEditing(true);
+    setCopySucceeded(false);
+    setInputMode('CSV');
+    setMessage('현재 입력 내용을 초기화했습니다. 저장된 데이터는 삭제되지 않습니다.');
+  }
+
   function updateAllCsvRowsSelected(selected) {
     setCsvRows((current) => current.map((row) => ({ ...row, selected })));
   }
 
+  function getSelectedWeekTypes(row) {
+    return row.weekSelection === 'ALL' ? ['THIS_WEEK', 'NEXT_WEEK'] : [row.weekSelection];
+  }
+
   function getPendingWeekTypes(row) {
-    const selectedWeekTypes = row.weekSelection === 'ALL' ? ['THIS_WEEK', 'NEXT_WEEK'] : [row.weekSelection];
-    return selectedWeekTypes.filter((weekType) => !row.savedWeekTypes?.includes(weekType));
+    return getSelectedWeekTypes(row).filter((weekType) => !row.savedWeekTypes?.includes(weekType));
   }
 
   function getSavedCsvWeekTypes(row, itemList = items) {
@@ -117,7 +138,9 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   }
 
   function isDuplicateCsvMessage(message) {
-    return String(message ?? '').includes('CSV row has already been saved');
+    const normalizedMessage = String(message ?? '');
+    return normalizedMessage.includes('CSV row has already been saved')
+      || normalizedMessage.includes('이미 저장된 CSV 행');
   }
 
   function handleCsvFileChange(event) {
@@ -157,6 +180,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             title: skipped.title,
             sourceKey: skipped.sourceKey,
             sourceRowNumber: skipped.lineNumber,
+            completedDate: skipped.completedDate,
             weekType: null,
             message: '기존 완료건',
           })),
@@ -203,9 +227,13 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       let failedCount = 0;
       const results = [];
       const savedWeekTypesByRow = {};
+      const selectedSources = [];
       for (const row of rowsToSave) {
         const weekTypes = getPendingWeekTypes(row);
         if (weekTypes.length === 0) {
+          getSelectedWeekTypes(row).forEach((weekType) => {
+            selectedSources.push({ sourceKey: row.sourceKey, weekType });
+          });
           results.push({
             key: `${row.tempId}-skipped`,
             status: 'success',
@@ -219,7 +247,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         }
         for (const weekType of weekTypes) {
           try {
-            await requestApi('/api/report-items', {
+            const savedItem = await requestApi('/api/report-items', {
               body: {
                 reportStartDate: weekRange.startDate,
                 reportEndDate: weekRange.endDate,
@@ -241,6 +269,10 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               token,
             });
             createdCount += 1;
+            selectedSources.push({
+              sourceKey: savedItem.sourceKey ?? row.sourceKey,
+              weekType: savedItem.weekType ?? weekType,
+            });
             savedWeekTypesByRow[row.tempId] = [...(savedWeekTypesByRow[row.tempId] ?? []), weekType];
             results.push({
               key: `${row.tempId}-${weekType}`,
@@ -254,6 +286,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
           } catch (error) {
             if (isDuplicateCsvMessage(error.message)) {
               savedWeekTypesByRow[row.tempId] = [...(savedWeekTypesByRow[row.tempId] ?? []), weekType];
+              selectedSources.push({ sourceKey: row.sourceKey, weekType });
               results.push({
                 key: `${row.tempId}-${weekType}`,
                 status: 'success',
@@ -297,8 +330,19 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       }
       const validationNotice = csvValidationResults.length > 0 ? `, 검증 제외 ${csvValidationResults.length}건` : '';
       setMessage(`CSV 저장 결과: 성공 ${createdCount}건, 실패 ${failedCount}건${validationNotice}`);
-      if (createdCount > 0) {
-        await loadReportItems();
+      if (selectedSources.length > 0) {
+        const refreshedItems = await loadReportItems();
+        const nextSelectedIds = refreshedItems
+          .filter((item) => item.sourceType === 'CSV'
+            && item.saveStatus === 'SAVED'
+            && selectedSources.some((source) => source.sourceKey === item.sourceKey && source.weekType === item.weekType))
+          .map((item) => item.id);
+        setSelectedIds([...new Set(nextSelectedIds)]);
+        setMergedReportId(null);
+        setMergedText(null);
+        setMergedReportStatus(null);
+        setIsMergedReportEditing(true);
+        setCopySucceeded(false);
       }
     } catch (error) {
       setMessage(error.message);
@@ -322,8 +366,12 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       setSelectedIds((current) => current.filter((id) => data.some((item) => item.id === id && item.saveStatus === 'SAVED')));
       setMergedReportId(null);
       setMergedText(null);
+      setMergedReportStatus(null);
+      setIsMergedReportEditing(true);
+      return data;
     } catch (error) {
       setMessage(error.message);
+      return [];
     } finally {
       setIsLoading(false);
     }
@@ -383,10 +431,18 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       };
       const path = reportForm.id ? `/api/report-items/${reportForm.id}` : '/api/report-items';
       const method = reportForm.id ? 'PUT' : 'POST';
-      await requestApi(path, { method, body, token });
+      const data = await requestApi(path, { method, body, token });
       setReportForm(initialReportForm);
       setMessage(saveStatus === 'DRAFT' ? '임시저장되었습니다.' : '저장되었습니다.');
       await loadReportItems();
+      if (saveStatus === 'SAVED') {
+        setSelectedIds((current) => [...new Set([...current, data.id])]);
+        setMergedReportId(null);
+        setMergedText(null);
+        setMergedReportStatus(null);
+        setIsMergedReportEditing(true);
+        setCopySucceeded(false);
+      }
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -400,31 +456,24 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     saveReportItem(saveStatus);
   }
 
-  async function submitSelectedItems() {
+  async function markSelectedItemsSubmitted() {
     if (selectedIds.length === 0) {
       setMessage('제출할 항목을 선택해 주세요.');
-      return;
+      return false;
     }
-    if (items.some((item) => selectedIds.includes(item.id) && item.saveStatus !== 'SAVED')) {
-      setMessage('저장 상태의 항목만 제출할 수 있습니다.');
-      return;
+    const selectedItems = items.filter((item) => selectedIds.includes(item.id));
+    if (selectedItems.some((item) => !['SAVED', 'SUBMITTED'].includes(item.saveStatus))) {
+      setMessage('저장 또는 제출 상태의 항목만 최종병합에 포함할 수 있습니다.');
+      return false;
     }
-
-    setIsLoading(true);
-    setMessage('');
-
-    try {
+    const savedIds = selectedItems.filter((item) => item.saveStatus === 'SAVED').map((item) => item.id);
+    if (savedIds.length > 0) {
       await requestApi('/api/report-items/submit', {
-        body: { itemIds: selectedIds },
+        body: { itemIds: savedIds },
         token,
       });
-      setMessage('선택한 항목을 제출했습니다.');
-      await loadReportItems();
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setIsLoading(false);
     }
+    return true;
   }
 
   function editReportItem(item) {
@@ -457,6 +506,8 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     ));
     setMergedReportId(null);
     setMergedText(null);
+    setMergedReportStatus(null);
+    setIsMergedReportEditing(true);
   }
 
   function toggleAllSelectedItems() {
@@ -468,17 +519,21 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setSelectedIds(allSelectableItemsSelected ? [] : selectableItemIds);
     setMergedReportId(null);
     setMergedText(null);
+    setMergedReportStatus(null);
+    setIsMergedReportEditing(true);
   }
 
   function loadSavedMergedReport(report) {
     setMergedReportId(report.id);
     setMergedText(report.mergedText);
+    setMergedReportStatus(report.status);
+    setIsMergedReportEditing(report.status !== 'FINAL');
     setSelectedIds(report.sourceItemIds ?? []);
     setCopySucceeded(false);
-    setMessage('저장된 병합 결과를 불러왔습니다.');
+    setMessage(report.status === 'FINAL' ? '제출된 최종병합 결과를 불러왔습니다.' : '저장된 병합 결과를 불러왔습니다.');
   }
 
-  async function saveMergedReport() {
+  async function saveMergedReport(status = 'SAVED') {
     if (!mergedReportId && selectedIds.length === 0) {
       setMessage('저장할 병합 항목을 선택해 주세요.');
       return;
@@ -487,27 +542,43 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       setMessage('저장할 병합 텍스트가 없습니다.');
       return;
     }
+    if (status === 'FINAL' && selectedIds.length === 0) {
+      setMessage('관리자에게 제출할 항목을 선택해 주세요.');
+      return;
+    }
 
     setIsLoading(true);
     setMessage('');
 
     try {
+      if (status === 'FINAL') {
+        const canSubmit = await markSelectedItemsSubmitted();
+        if (!canSubmit) {
+          return;
+        }
+      }
       const body = {
         mergeType: 'MEMBER',
         reportStartDate: weekRange.startDate,
         reportEndDate: weekRange.endDate,
         mergedText: activeMergedText,
-        status: 'SAVED',
+        status,
         sourceItemIds: selectedIds,
       };
       const path = mergedReportId ? `/api/merged-reports/${mergedReportId}` : '/api/merged-reports';
       const method = mergedReportId ? 'PUT' : 'POST';
       const data = await requestApi(path, { method, body, token });
+      if (status === 'FINAL') {
+        await loadReportItems();
+      }
       setMergedReportId(data.id);
       setMergedText(data.mergedText);
+      setMergedReportStatus(data.status);
+      setIsMergedReportEditing(data.status !== 'FINAL');
+      setSelectedIds(data.sourceItemIds ?? selectedIds);
       setCopySucceeded(false);
       await loadMergedReports();
-      setMessage(mergedReportId ? '병합 결과를 수정 저장했습니다.' : '병합 결과를 저장했습니다.');
+      setMessage(status === 'FINAL' ? '최종병합 내용을 관리자 페이지로 제출했습니다.' : (mergedReportId ? '병합 결과를 수정 저장했습니다.' : '병합 결과를 저장했습니다.'));
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -534,6 +605,44 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     }
   }
 
+  async function deleteCurrentItems() {
+    if (selectedIds.length === 0) {
+      setMessage('삭제할 현재 항목이 없습니다.');
+      return;
+    }
+    if (isFinalMergedReport) {
+      setMessage('FINAL 제출본에 포함된 항목은 삭제할 수 없습니다.');
+      return;
+    }
+    if (!window.confirm('현재 최종병합 대상 항목을 삭제할까요? FINAL 제출본에 포함된 항목은 삭제되지 않습니다.')) {
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage('');
+    try {
+      const results = await Promise.allSettled(selectedIds.map((id) => requestApi(`/api/report-items/${id}`, {
+        method: 'DELETE',
+        token,
+      })));
+      const deletedCount = results.filter((result) => result.status === 'fulfilled').length;
+      const failedCount = results.length - deletedCount;
+      await loadReportItems();
+      setMergedReportId(null);
+      setMergedText(null);
+      setMergedReportStatus(null);
+      setIsMergedReportEditing(true);
+      setSelectedIds([]);
+      setCopySucceeded(false);
+      await loadMergedReports();
+      setMessage(`현재 항목 삭제 결과: 성공 ${deletedCount}건, 실패 ${failedCount}건`);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <div className="report-layout">
       {isPendingManager && (
@@ -555,6 +664,9 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
           </div>
           <button className="secondary-button" type="button" onClick={loadReportItems}>
             새로고침
+          </button>
+          <button className="secondary-button" type="button" onClick={clearCurrentWork} disabled={isLoading}>
+            현재 입력 초기화
           </button>
         </div>
 
@@ -601,20 +713,14 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <div className="csv-import-card">
               <div>
                 <strong>{csvFileName || 'CSV 처리 결과'}</strong>
-                <span>가져올 행 {csvRows.length}건 · 선택 {selectedCsvRowCount}건 · 오류/제외 {csvValidationResults.length}건</span>
+                <span>
+                  가져올 행 {csvRows.length}건 · 선택 {selectedCsvRowCount}건 · 기존 완료건 {csvCompletedExcludedCount}건 · 오류 {csvValidationResults.length - csvCompletedExcludedCount}건
+                  {csvSaveResults.length > 0 && ` · 저장 성공 ${csvSaveSuccessCount}건 · 저장 실패 ${csvSaveFailureCount}건`}
+                </span>
               </div>
               <button className="primary-button compact" type="button" onClick={() => setCsvModalOpen(true)} disabled={isLoading}>
                 그리드 열기
               </button>
-            </div>
-          )}
-
-          {csvSaveResults.length > 0 && (
-            <div className="csv-save-summary" role="status" aria-live="polite" aria-label="CSV 저장 결과">
-              <strong>CSV 저장 결과</strong>
-              <span>
-                성공 {csvSaveResults.filter((result) => result.status === 'success').length}건 · 실패 {csvSaveResults.filter((result) => result.status === 'error').length}건
-              </span>
             </div>
           )}
         </div>
@@ -643,7 +749,8 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                 <div className="summary-counts">
                   <span>가져올 행 {csvRows.length}</span>
                   <strong>선택 {selectedCsvRowCount}</strong>
-                  <span>오류/제외 {csvValidationResults.length}</span>
+                  <span>기존 완료건 {csvCompletedExcludedCount}</span>
+                  <span>오류 {csvValidationResults.length - csvCompletedExcludedCount}</span>
                 </div>
                 <div className="button-row csv-grid-actions">
                   <button className="secondary-button" type="button" onClick={() => updateAllCsvRowsSelected(true)} disabled={csvRows.length === 0 || isLoading}>
@@ -739,7 +846,11 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                       <span>{result.status === 'warning' ? '제외' : '검증 오류'}</span>
                       <strong>{result.weekType ? weekTypeLabels[result.weekType] : '검증'}</strong>
                       <span>{result.title}</span>
-                      <span>{result.message}</span>
+                      <span>
+                        {result.status === 'warning'
+                          ? `기존 완료건 · 완료일 ${result.completedDate || '-'}`
+                          : result.message}
+                      </span>
                     </p>
                   ))}
                 </div>
@@ -777,7 +888,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <input
               value={reportForm.unitTask}
               onChange={(event) => updateReportForm('unitTask', event.target.value)}
-              placeholder="예: 주간보고"
+              placeholder="예: 공통"
               required
             />
           </label>
@@ -832,100 +943,6 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         )}
       </section>
 
-      <section className="tool-panel">
-        <div className="section-header">
-          <div>
-            <p className="panel-label">저장된 항목</p>
-            <h2>제출 항목 선택</h2>
-          </div>
-          <div className="section-actions">
-            <div className="summary-counts">
-              <span>저장 {savedItemCount}</span>
-              <strong>선택 {selectedIds.length}</strong>
-            </div>
-            <button className="secondary-button compact" type="button" onClick={toggleAllSelectedItems} disabled={selectableItemIds.length === 0 || isLoading}>
-              {allSelectableItemsSelected ? '전체 해제' : '전체 선택'}
-            </button>
-            <button className="primary-button compact" type="button" onClick={submitSelectedItems} disabled={selectedIds.length === 0 || isLoading}>
-              제출
-            </button>
-          </div>
-        </div>
-
-        <div className="items-table-wrap">
-          <table className="items-table" aria-label="주간업무 항목 목록">
-            <thead>
-              <tr>
-                <th scope="col">
-                  <label className="check-label table-check">
-                    <input
-                      type="checkbox"
-                      aria-label="제출 항목 전체 선택"
-                      checked={allSelectableItemsSelected}
-                      disabled={selectableItemIds.length === 0}
-                      onChange={toggleAllSelectedItems}
-                    />
-                  </label>
-                </th>
-                <th scope="col">구분</th>
-                <th scope="col">업무</th>
-                <th scope="col">단위업무</th>
-                <th scope="col">일감</th>
-                <th scope="col">세부사항</th>
-                <th scope="col">완료예정</th>
-                <th scope="col">저장</th>
-                <th scope="col">수정</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td className="empty-state" colSpan="9">아직 저장된 항목이 없습니다.</td>
-                </tr>
-              ) : items.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <label className="check-label table-check">
-                      <input
-                        type="checkbox"
-                        aria-label={`${item.unitTask} ${item.title} 선택`}
-                        checked={selectedIds.includes(item.id)}
-                        disabled={item.saveStatus !== 'SAVED'}
-                        onChange={() => toggleSelected(item.id)}
-                      />
-                    </label>
-                  </td>
-                  <td>{weekTypeLabels[item.weekType]}</td>
-                  <td>{categoryLabels[item.category ?? 'EXECUTION']}</td>
-                  <td>{item.unitTask}</td>
-                  <td>
-                    {item.sourceKey ? (
-                      <a className="issue-link" href={buildIssueUrl(item.sourceKey)} target="_blank" rel="noreferrer">
-                        #{item.sourceKey}
-                      </a>
-                    ) : (
-                      <span className="muted-text">-</span>
-                    )}
-                  </td>
-                  <td>{item.title}</td>
-                  <td>{formatReportItemDueLabel(item) || statusLabels[item.status]}</td>
-                  <td>{item.saveStatus}</td>
-                  <td>
-                    {item.saveStatus === 'SUBMITTED' ? (
-                      <span className="muted-text">읽기</span>
-                    ) : (
-                      <button className="link-button" type="button" onClick={() => editReportItem(item)}>
-                        수정
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
       <section className="tool-panel preview-panel">
         <div className="section-header">
           <div>
@@ -936,8 +953,20 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             <button className="secondary-button" type="button" onClick={loadMergedReports} disabled={isLoading}>
               목록 새로고침
             </button>
-            <button className="secondary-button" type="button" onClick={saveMergedReport} disabled={(!mergedReportId && selectedIds.length === 0) || !activeMergedText.trim() || isLoading}>
-              {mergedReportId ? '수정 저장' : '저장'}
+            {isFinalMergedReportLocked ? (
+              <button className="secondary-button" type="button" onClick={() => setIsMergedReportEditing(true)} disabled={isLoading}>
+                수정
+              </button>
+            ) : !isFinalMergedReport ? (
+              <button className="secondary-button" type="button" onClick={() => saveMergedReport('SAVED')} disabled={(!mergedReportId && selectedIds.length === 0) || !activeMergedText.trim() || isLoading}>
+                {mergedReportId ? '수정 저장' : '저장'}
+              </button>
+            ) : null}
+            <button className="primary-button compact" type="button" onClick={() => saveMergedReport('FINAL')} disabled={!canPersistMergedReport || isFinalMergedReportLocked}>
+              {isFinalMergedReport ? '다시 제출' : '제출'}
+            </button>
+            <button className="danger-button compact" type="button" onClick={deleteCurrentItems} disabled={selectedIds.length === 0 || isLoading || isFinalMergedReport}>
+              현재 항목 삭제
             </button>
             <button className="primary-button compact" type="button" onClick={copyPreview} disabled={(!mergedReportId && selectedIds.length === 0) || !activeMergedText.trim()}>
               {copySucceeded ? '복사됨' : '복사'}
@@ -967,6 +996,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
         <textarea
           className="preview-editor"
           value={activeMergedText}
+          readOnly={mergedReportStatus === 'FINAL' && !isMergedReportEditing}
           onChange={(event) => {
             setMergedText(event.target.value);
             setCopySucceeded(false);

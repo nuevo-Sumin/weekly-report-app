@@ -21,7 +21,7 @@ export const initialFindForm = {
 export const initialReportForm = {
   id: null,
   weekType: 'THIS_WEEK',
-  category: 'EXECUTION',
+  category: 'BUSINESS_MANAGEMENT',
   unitTask: '',
   title: '',
   detailContent: '',

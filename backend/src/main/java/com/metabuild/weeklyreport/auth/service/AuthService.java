@@ -41,10 +41,10 @@ public class AuthService {
         String name = request.name().trim();
 
         if (userRepository.existsByLoginId(loginId)) {
-            throw new IllegalArgumentException("Login id already exists.");
+            throw new IllegalArgumentException("이미 사용 중인 아이디입니다.");
         }
         if (userRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("Email already exists.");
+            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
         }
 
         UserRole requestedRole = request.requestedRole() == null ? UserRole.USER : request.requestedRole();
@@ -82,7 +82,7 @@ public class AuthService {
         User user = userRepository.findByLoginId(loginId)
                 .filter(found -> passwordEncoder.matches(request.password(), found.getPasswordHash()))
                 .filter(User::isActive)
-                .orElseThrow(() -> new BadCredentialsException("Invalid login id or password."));
+                .orElseThrow(() -> new BadCredentialsException("아이디 또는 비밀번호가 올바르지 않습니다."));
 
         String accessToken = jwtTokenProvider.createAccessToken(user);
         return LoginResponse.bearer(accessToken, user);
@@ -91,7 +91,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public CurrentUserResponse getCurrentUser(String loginId) {
         User user = userRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found."));
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
         return CurrentUserResponse.from(user);
     }
 

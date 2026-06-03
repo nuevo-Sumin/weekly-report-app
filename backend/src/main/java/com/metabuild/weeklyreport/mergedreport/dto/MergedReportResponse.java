@@ -10,6 +10,7 @@ import java.util.List;
 public record MergedReportResponse(
         Long id,
         Long createdById,
+        String createdByLoginId,
         String createdByName,
         MergeType mergeType,
         LocalDate reportStartDate,
@@ -29,6 +30,7 @@ public record MergedReportResponse(
         return new MergedReportResponse(
                 report.getId(),
                 report.getCreatedBy().getId(),
+                report.getCreatedBy().getLoginId(),
                 report.getCreatedBy().getName(),
                 report.getMergeType(),
                 report.getReportStartDate(),

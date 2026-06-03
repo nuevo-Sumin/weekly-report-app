@@ -39,7 +39,7 @@ public class MergedReportController {
             @Valid @RequestBody MergedReportRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(mergedReportService.create(authentication.getName(), request), "Merged report created."));
+                .body(ApiResponse.success(mergedReportService.create(authentication.getName(), request), "병합 결과가 생성되었습니다."));
     }
 
     @GetMapping
@@ -65,7 +65,7 @@ public class MergedReportController {
     ) {
         return ApiResponse.success(
                 mergedReportService.update(authentication.getName(), reportId, request),
-                "Merged report updated."
+                "병합 결과가 수정되었습니다."
         );
     }
 }

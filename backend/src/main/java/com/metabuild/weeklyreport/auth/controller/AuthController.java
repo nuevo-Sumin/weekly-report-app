@@ -27,11 +27,11 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<SignupResponse>> signup(@Valid @RequestBody SignupRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(authService.signup(request), "Signup completed."));
+                .body(ApiResponse.success(authService.signup(request), "회원가입이 완료되었습니다."));
     }
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.success(authService.login(request), "Login completed.");
+        return ApiResponse.success(authService.login(request), "로그인되었습니다.");
     }
 }

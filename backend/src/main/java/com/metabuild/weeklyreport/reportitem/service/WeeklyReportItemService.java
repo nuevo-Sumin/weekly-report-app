@@ -1,5 +1,7 @@
 package com.metabuild.weeklyreport.reportitem.service;
 
+import com.metabuild.weeklyreport.mergedreport.entity.MergedReportStatus;
+import com.metabuild.weeklyreport.mergedreport.repository.MergedReportItemRepository;
 import com.metabuild.weeklyreport.reportitem.dto.AdminReportItemResponse;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemResponse;
@@ -26,13 +28,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class WeeklyReportItemService {
 
     private final WeeklyReportItemRepository reportItemRepository;
+    private final MergedReportItemRepository mergedReportItemRepository;
     private final UserRepository userRepository;
 
     public WeeklyReportItemService(
             WeeklyReportItemRepository reportItemRepository,
+            MergedReportItemRepository mergedReportItemRepository,
             UserRepository userRepository
     ) {
         this.reportItemRepository = reportItemRepository;
+        this.mergedReportItemRepository = mergedReportItemRepository;
         this.userRepository = userRepository;
     }
 
@@ -98,7 +103,7 @@ public class WeeklyReportItemService {
     public ReportItemResponse update(String loginId, Long itemId, ReportItemRequest request) {
         WeeklyReportItem item = getOwnedItem(loginId, itemId);
         if (item.getSaveStatus() == SaveStatus.SUBMITTED) {
-            throw new IllegalArgumentException("Submitted report items cannot be edited.");
+            throw new IllegalArgumentException("제출된 업무 항목은 수정할 수 없습니다.");
         }
         ReportItemSourceType sourceType = normalizeSourceType(item.getSourceType());
         String sourceKey = item.getSourceKey();
@@ -130,20 +135,31 @@ public class WeeklyReportItemService {
         User author = getUser(loginId);
         Set<Long> requestedIds = new HashSet<>(request.itemIds());
         if (requestedIds.size() != request.itemIds().size()) {
-            throw new IllegalArgumentException("Duplicate report item ids are not allowed.");
+            throw new IllegalArgumentException("업무 항목 ID가 중복되었습니다.");
         }
         List<WeeklyReportItem> items = reportItemRepository.findByAuthorAndIdIn(author, requestedIds);
 
         if (items.size() != requestedIds.size()) {
-            throw new AccessDeniedException("Only your own report items can be submitted.");
+            throw new AccessDeniedException("본인의 업무 항목만 제출할 수 있습니다.");
         }
         if (items.stream().anyMatch(item -> item.getSaveStatus() != SaveStatus.SAVED)) {
-            throw new IllegalArgumentException("Only saved report items can be submitted.");
+            throw new IllegalArgumentException("저장 상태의 업무 항목만 제출할 수 있습니다.");
         }
 
         LocalDateTime now = LocalDateTime.now();
         items.forEach(item -> item.submit(now));
         return items.stream().map(ReportItemResponse::from).toList();
+    }
+
+    @Transactional
+    public void delete(String loginId, Long itemId) {
+        WeeklyReportItem item = getOwnedItem(loginId, itemId);
+        if (mergedReportItemRepository.existsByReportItemAndMergedReportStatus(item, MergedReportStatus.FINAL)) {
+            throw new IllegalArgumentException("최종 제출된 병합 결과에 포함된 업무 항목은 삭제할 수 없습니다.");
+        }
+
+        mergedReportItemRepository.deleteByReportItemAndMergedReportStatusNot(item, MergedReportStatus.FINAL);
+        reportItemRepository.delete(item);
     }
 
     @Transactional(readOnly = true)
@@ -155,7 +171,7 @@ public class WeeklyReportItemService {
             WeekType weekType
     ) {
         if (reportStartDate.isAfter(reportEndDate)) {
-            throw new IllegalArgumentException("Report start date must be before or equal to report end date.");
+            throw new IllegalArgumentException("보고 시작일은 보고 종료일보다 늦을 수 없습니다.");
         }
 
         return reportItemRepository.findSubmittedItemsForAdmin(
@@ -173,12 +189,12 @@ public class WeeklyReportItemService {
     private WeeklyReportItem getOwnedItem(String loginId, Long itemId) {
         User author = getUser(loginId);
         return reportItemRepository.findByAuthorAndId(author, itemId)
-                .orElseThrow(() -> new EntityNotFoundException("Report item not found."));
+                .orElseThrow(() -> new EntityNotFoundException("업무 항목을 찾을 수 없습니다."));
     }
 
     private User getUser(String loginId) {
         return userRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found."));
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
     }
 
     private SaveStatus normalizeWritableSaveStatus(SaveStatus saveStatus) {
@@ -186,7 +202,7 @@ public class WeeklyReportItemService {
             return SaveStatus.SAVED;
         }
         if (saveStatus == SaveStatus.SUBMITTED) {
-            throw new IllegalArgumentException("Use submit API to submit report items.");
+            throw new IllegalArgumentException("업무 항목 제출은 제출 API를 사용해 주세요.");
         }
         return saveStatus;
     }
@@ -248,7 +264,7 @@ public class WeeklyReportItemService {
                 );
 
         if (exists) {
-            throw new IllegalArgumentException("CSV row has already been saved for this report period and week type.");
+            throw new IllegalArgumentException("해당 보고기간과 주차에 이미 저장된 CSV 행입니다.");
         }
     }
 

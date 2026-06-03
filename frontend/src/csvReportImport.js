@@ -231,7 +231,7 @@ export function parseReportCsvBufferWithErrors(buffer) {
 }
 
 export function filterCsvRowsForReportPeriod(rows, weekRange) {
-  return rows.reduce((acc, row) => {
+  const filtered = rows.reduce((acc, row) => {
     if (!row.completed && row.status !== 'DONE') {
       acc.rows.push(row);
       return acc;
@@ -246,12 +246,28 @@ export function filterCsvRowsForReportPeriod(rows, weekRange) {
       lineNumber: row.sourceRowNumber,
       sourceKey: row.sourceKey,
       title: row.title,
+      completedDate: row.completedDate,
       message: row.completedDate
         ? `${row.sourceRowNumber}행의 완료 항목은 보고기간 밖 완료일이라 제외했습니다.`
         : `${row.sourceRowNumber}행의 완료 항목은 완료일이 없어 제외했습니다.`,
     });
     return acc;
   }, { rows: [], skipped: [] });
+
+  const statusOrder = {
+    DONE: 0,
+    IN_PROGRESS: 1,
+    HOLD: 2,
+    NEW: 3,
+  };
+  filtered.rows.sort((first, second) => (
+    first.unitTask.localeCompare(second.unitTask, 'ko')
+    || (statusOrder[first.status] ?? 99) - (statusOrder[second.status] ?? 99)
+    || String(first.dueDate || '9999-12-31').localeCompare(String(second.dueDate || '9999-12-31'))
+    || first.sourceRowNumber - second.sourceRowNumber
+  ));
+
+  return filtered;
 }
 
 function decodeCsvBuffer(buffer) {

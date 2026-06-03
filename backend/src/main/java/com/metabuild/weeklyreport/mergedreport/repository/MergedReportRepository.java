@@ -2,6 +2,7 @@ package com.metabuild.weeklyreport.mergedreport.repository;
 
 import com.metabuild.weeklyreport.mergedreport.entity.MergeType;
 import com.metabuild.weeklyreport.mergedreport.entity.MergedReport;
+import com.metabuild.weeklyreport.mergedreport.entity.MergedReportStatus;
 import com.metabuild.weeklyreport.user.entity.User;
 import java.time.LocalDate;
 import java.util.List;
@@ -24,4 +25,11 @@ public interface MergedReportRepository extends JpaRepository<MergedReport, Long
     );
 
     Optional<MergedReport> findByCreatedByAndId(User createdBy, Long id);
+
+    List<MergedReport> findByReportStartDateAndReportEndDateAndMergeTypeAndStatusOrderByUpdatedAtDesc(
+            LocalDate reportStartDate,
+            LocalDate reportEndDate,
+            MergeType mergeType,
+            MergedReportStatus status
+    );
 }

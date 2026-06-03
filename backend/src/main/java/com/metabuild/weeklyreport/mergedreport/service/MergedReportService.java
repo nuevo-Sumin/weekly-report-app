@@ -92,16 +92,43 @@ public class MergedReportService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<MergedReportResponse> getSubmittedMemberReportsForAdmin(
+            String loginId,
+            LocalDate reportStartDate,
+            LocalDate reportEndDate
+    ) {
+        User manager = getUser(loginId);
+        if (manager.getRole() != UserRole.MANAGER) {
+            throw new AccessDeniedException("관리자만 개발자 최종병합 제출본을 조회할 수 있습니다.");
+        }
+        validateDateRange(reportStartDate, reportEndDate);
+
+        List<MergedReport> reports = mergedReportRepository.findByReportStartDateAndReportEndDateAndMergeTypeAndStatusOrderByUpdatedAtDesc(
+                reportStartDate,
+                reportEndDate,
+                MergeType.MEMBER,
+                MergedReportStatus.FINAL
+        );
+        Map<Long, List<Long>> sourceItemIdsByReportId = getSourceItemIdsByReportId(reports);
+        return reports.stream()
+                .map(report -> MergedReportResponse.from(
+                        report,
+                        sourceItemIdsByReportId.getOrDefault(report.getId(), List.of())
+                ))
+                .toList();
+    }
+
     @Transactional
     public MergedReportResponse update(String loginId, Long reportId, MergedReportRequest request) {
         User createdBy = getUser(loginId);
         validateRequest(createdBy, request);
 
         MergedReport report = mergedReportRepository.findByCreatedByAndId(createdBy, reportId)
-                .orElseThrow(() -> new EntityNotFoundException("Merged report not found."));
+                .orElseThrow(() -> new EntityNotFoundException("병합 결과를 찾을 수 없습니다."));
         validateMergeType(createdBy, report.getMergeType());
         if (request.mergeType() != report.getMergeType()) {
-            throw new IllegalArgumentException("Merge type cannot be changed.");
+            throw new IllegalArgumentException("병합 유형은 변경할 수 없습니다.");
         }
         report.update(
                 request.mergeType(),
@@ -127,13 +154,13 @@ public class MergedReportService {
 
     private void validateDateRange(LocalDate reportStartDate, LocalDate reportEndDate) {
         if (reportStartDate.isAfter(reportEndDate)) {
-            throw new IllegalArgumentException("Report start date must be before or equal to report end date.");
+            throw new IllegalArgumentException("보고 시작일은 보고 종료일보다 늦을 수 없습니다.");
         }
     }
 
     private void validateMergeType(User user, MergeType mergeType) {
         if (mergeType != expectedMergeType(user)) {
-            throw new AccessDeniedException("Merge type is not allowed for current user role.");
+            throw new AccessDeniedException("현재 권한으로는 해당 병합 유형을 사용할 수 없습니다.");
         }
     }
 
@@ -163,7 +190,7 @@ public class MergedReportService {
     ) {
         Set<Long> requestedIds = new HashSet<>(sourceItemIds);
         if (requestedIds.size() != sourceItemIds.size()) {
-            throw new IllegalArgumentException("Duplicate source report item ids are not allowed.");
+            throw new IllegalArgumentException("원천 업무 항목 ID가 중복되었습니다.");
         }
         if (requestedIds.isEmpty()) {
             return List.of();
@@ -171,7 +198,7 @@ public class MergedReportService {
 
         List<WeeklyReportItem> sourceItems = findAvailableSourceItems(createdBy, report, requestedIds);
         if (sourceItems.size() != requestedIds.size()) {
-            throw new AccessDeniedException("Source report items are not available for this merged report.");
+            throw new AccessDeniedException("이 병합 결과에 사용할 수 없는 원천 업무 항목이 포함되어 있습니다.");
         }
 
         sourceItems.forEach(sourceItem -> validateSourceItem(createdBy, report, sourceItem));
@@ -203,21 +230,21 @@ public class MergedReportService {
     private void validateSourceItem(User createdBy, MergedReport report, WeeklyReportItem sourceItem) {
         if (!sourceItem.getReportStartDate().equals(report.getReportStartDate())
                 || !sourceItem.getReportEndDate().equals(report.getReportEndDate())) {
-            throw new IllegalArgumentException("Source report items must belong to the merged report period.");
+            throw new IllegalArgumentException("원천 업무 항목은 병합 결과의 보고기간에 포함되어야 합니다.");
         }
 
         if (report.getMergeType() == MergeType.MEMBER) {
             if (!sourceItem.getAuthor().getId().equals(createdBy.getId())) {
-                throw new AccessDeniedException("Only your own report items can be linked.");
+                throw new AccessDeniedException("본인의 업무 항목만 연결할 수 있습니다.");
             }
             if (sourceItem.getSaveStatus() == SaveStatus.DRAFT) {
-                throw new IllegalArgumentException("Draft report items cannot be linked to merged reports.");
+                throw new IllegalArgumentException("임시저장 항목은 병합 결과에 연결할 수 없습니다.");
             }
             return;
         }
 
         if (sourceItem.getSaveStatus() != SaveStatus.SUBMITTED) {
-            throw new IllegalArgumentException("Only submitted report items can be linked to admin merged reports.");
+            throw new IllegalArgumentException("관리자 취합에는 제출된 업무 항목만 연결할 수 있습니다.");
         }
     }
 
@@ -248,6 +275,6 @@ public class MergedReportService {
 
     private User getUser(String loginId) {
         return userRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found."));
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
     }
 }

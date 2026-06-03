@@ -1,6 +1,7 @@
 package com.metabuild.weeklyreport.reportitem;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,6 +11,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metabuild.weeklyreport.auth.dto.LoginRequest;
 import com.metabuild.weeklyreport.auth.dto.SignupRequest;
+import com.metabuild.weeklyreport.mergedreport.dto.MergedReportRequest;
+import com.metabuild.weeklyreport.mergedreport.entity.MergeType;
+import com.metabuild.weeklyreport.mergedreport.entity.MergedReportStatus;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemRequest;
 import com.metabuild.weeklyreport.reportitem.dto.ReportItemSubmitRequest;
 import com.metabuild.weeklyreport.reportitem.entity.ReportItemStatus;
@@ -261,6 +265,37 @@ class WeeklyReportItemIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
+    @Test
+    void userCanDeleteItemNotLinkedToFinalMergedReport() throws Exception {
+        String token = signupAndLogin("deleteitem");
+        Long itemId = createItem(token, "Delete Source", SaveStatus.SAVED);
+        createMergedReport(token, itemId, MergedReportStatus.SAVED);
+
+        mockMvc.perform(delete("/api/report-items/{itemId}", itemId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(get("/api/report-items")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .param("reportStartDate", "2026-05-25")
+                        .param("reportEndDate", "2026-05-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void userCannotDeleteItemLinkedToFinalMergedReport() throws Exception {
+        String token = signupAndLogin("deletefinalitem");
+        Long itemId = createItem(token, "Final Source", SaveStatus.SAVED);
+        createMergedReport(token, itemId, MergedReportStatus.FINAL);
+
+        mockMvc.perform(delete("/api/report-items/{itemId}", itemId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
     private Long createItem(String token, String unitTask, SaveStatus saveStatus) throws Exception {
         ReportItemRequest request = reportItemRequest(unitTask, saveStatus);
         MvcResult result = mockMvc.perform(post("/api/report-items")
@@ -285,6 +320,23 @@ class WeeklyReportItemIntegrationTest {
 
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
         return response.path("data").path("id").asLong();
+    }
+
+    private void createMergedReport(String token, Long itemId, MergedReportStatus status) throws Exception {
+        MergedReportRequest request = new MergedReportRequest(
+                MergeType.MEMBER,
+                LocalDate.of(2026, 5, 25),
+                LocalDate.of(2026, 5, 31),
+                "merged text",
+                status,
+                List.of(itemId)
+        );
+
+        mockMvc.perform(post("/api/merged-reports")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
     }
 
     private ReportItemRequest reportItemRequest(String unitTask, SaveStatus saveStatus) {

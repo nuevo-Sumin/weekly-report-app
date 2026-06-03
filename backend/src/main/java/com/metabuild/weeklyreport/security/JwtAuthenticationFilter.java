@@ -110,6 +110,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         SecurityContextHolder.clearContext();
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        objectMapper.writeValue(response.getWriter(), ApiResponse.error("Invalid or expired token."));
+        objectMapper.writeValue(response.getWriter(), ApiResponse.error("토큰이 유효하지 않거나 만료되었습니다."));
     }
 }

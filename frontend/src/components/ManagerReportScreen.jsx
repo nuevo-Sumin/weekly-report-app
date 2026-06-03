@@ -14,12 +14,14 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   const today = useMemo(() => toDateInputValue(new Date()), []);
   const latestRequestId = useRef(0);
   const latestMergedReportsRequestId = useRef(0);
+  const latestMemberMergedReportsRequestId = useRef(0);
   const [filters, setFilters] = useState(initialFilters);
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [mergedText, setMergedText] = useState(null);
   const [mergedReportId, setMergedReportId] = useState(null);
   const [savedMergedReports, setSavedMergedReports] = useState([]);
+  const [submittedMemberReports, setSubmittedMemberReports] = useState([]);
   const [copySucceeded, setCopySucceeded] = useState(false);
 
   const weekRange = useMemo(() => getWeekRange(today), [today]);
@@ -35,6 +37,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       setSavedMergedReports([]);
       loadSubmittedItems();
       loadMergedReports();
+      loadSubmittedMemberReports();
     }
   }, [token, weekRange.startDate, weekRange.endDate]);
 
@@ -118,6 +121,37 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       }
     } finally {
       if (requestId === latestMergedReportsRequestId.current) {
+        setIsLoading(false);
+      }
+    }
+  }
+
+  async function loadSubmittedMemberReports() {
+    const requestId = latestMemberMergedReportsRequestId.current + 1;
+    latestMemberMergedReportsRequestId.current = requestId;
+    setIsLoading(true);
+    setSubmittedMemberReports([]);
+
+    try {
+      const query = new URLSearchParams({
+        reportStartDate: weekRange.startDate,
+        reportEndDate: weekRange.endDate,
+      });
+      const data = await requestApi(`/api/admin/merged-reports?${query.toString()}`, {
+        method: 'GET',
+        token,
+      });
+      if (requestId !== latestMemberMergedReportsRequestId.current) {
+        return;
+      }
+      setSubmittedMemberReports(data);
+    } catch (error) {
+      if (requestId === latestMemberMergedReportsRequestId.current) {
+        setSubmittedMemberReports([]);
+        setMessage(error.message);
+      }
+    } finally {
+      if (requestId === latestMemberMergedReportsRequestId.current) {
         setIsLoading(false);
       }
     }
@@ -213,6 +247,14 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setSelectedIds(report.sourceItemIds ?? []);
     setCopySucceeded(false);
     setMessage('저장된 취합 결과를 불러왔습니다.');
+  }
+
+  function loadSubmittedMemberReport(report) {
+    setMergedReportId(null);
+    setMergedText(report.mergedText);
+    setSelectedIds(report.sourceItemIds ?? []);
+    setCopySucceeded(false);
+    setMessage(`${report.createdByName}님의 제출본을 최종 텍스트로 불러왔습니다.`);
   }
 
   async function copyMergedText() {
@@ -382,6 +424,9 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
             <button className="secondary-button" type="button" onClick={loadMergedReports} disabled={isLoading}>
               목록 새로고침
             </button>
+            <button className="secondary-button" type="button" onClick={loadSubmittedMemberReports} disabled={isLoading}>
+              제출본 새로고침
+            </button>
             <button className="secondary-button" type="button" onClick={saveMergedReport} disabled={!mergedText?.trim() || isLoading}>
               {mergedReportId ? '수정 저장' : '저장'}
             </button>
@@ -389,6 +434,30 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
               {copySucceeded ? '복사됨' : '복사'}
             </button>
           </div>
+        </div>
+        <div className="saved-report-list-header">
+          <strong>개발자 최종병합 제출본</strong>
+          <span>{submittedMemberReports.length}건</span>
+        </div>
+        <div className="saved-report-list" aria-label="개발자 최종병합 제출본 목록">
+          {submittedMemberReports.length === 0 ? (
+            <p className="empty-list">제출된 개발자 최종병합 결과가 없습니다.</p>
+          ) : submittedMemberReports.map((report) => (
+            <button
+              key={report.id}
+              className="saved-report-button"
+              type="button"
+              onClick={() => loadSubmittedMemberReport(report)}
+            >
+              <strong>{report.createdByName}</strong>
+              <span>{formatDate(report.updatedAt.slice(0, 10))}</span>
+              <span>{report.mergedText.slice(0, 60)}</span>
+            </button>
+          ))}
+        </div>
+        <div className="saved-report-list-header">
+          <strong>저장된 관리자 취합 결과</strong>
+          <span>{savedMergedReports.length}건</span>
         </div>
         <div className="saved-report-list" aria-label="저장된 취합 결과 목록">
           {savedMergedReports.length === 0 ? (

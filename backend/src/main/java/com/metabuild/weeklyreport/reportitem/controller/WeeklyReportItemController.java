@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,7 +41,7 @@ public class WeeklyReportItemController {
             @Valid @RequestBody ReportItemRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(reportItemService.create(authentication.getName(), request), "Report item created."));
+                .body(ApiResponse.success(reportItemService.create(authentication.getName(), request), "업무 항목이 생성되었습니다."));
     }
 
     @GetMapping
@@ -64,7 +65,16 @@ public class WeeklyReportItemController {
             @PathVariable Long itemId,
             @Valid @RequestBody ReportItemRequest request
     ) {
-        return ApiResponse.success(reportItemService.update(authentication.getName(), itemId, request), "Report item updated.");
+        return ApiResponse.success(reportItemService.update(authentication.getName(), itemId, request), "업무 항목이 수정되었습니다.");
+    }
+
+    @DeleteMapping("/{itemId}")
+    public ApiResponse<Void> delete(
+            Authentication authentication,
+            @PathVariable Long itemId
+    ) {
+        reportItemService.delete(authentication.getName(), itemId);
+        return ApiResponse.success(null, "업무 항목이 삭제되었습니다.");
     }
 
     @PostMapping("/submit")
@@ -72,6 +82,6 @@ public class WeeklyReportItemController {
             Authentication authentication,
             @Valid @RequestBody ReportItemSubmitRequest request
     ) {
-        return ApiResponse.success(reportItemService.submit(authentication.getName(), request), "Report items submitted.");
+        return ApiResponse.success(reportItemService.submit(authentication.getName(), request), "업무 항목이 제출되었습니다.");
     }
 }

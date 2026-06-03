@@ -44,16 +44,16 @@ public class GlobalExceptionHandler {
         String message = ex.getMostSpecificCause().getMessage();
         if (message != null && message.toLowerCase().contains("uk_report_item_csv_source")) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.error("CSV row has already been saved for this report period and week type."));
+                    .body(ApiResponse.error("해당 보고기간과 주차에 이미 저장된 CSV 행입니다."));
         }
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("Login id or email already exists."));
+                .body(ApiResponse.error("이미 사용 중인 아이디 또는 이메일입니다."));
     }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials() {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Invalid login id or password."));
+                .body(ApiResponse.error("아이디 또는 비밀번호가 올바르지 않습니다."));
     }
 
     @ExceptionHandler(EntityNotFoundException.class)
@@ -63,6 +63,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied() {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Access denied."));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("접근 권한이 없습니다."));
     }
 }

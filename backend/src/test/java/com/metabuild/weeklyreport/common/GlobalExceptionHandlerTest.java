@@ -23,6 +23,6 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().message())
-                .isEqualTo("CSV row has already been saved for this report period and week type.");
+                .isEqualTo("해당 보고기간과 주차에 이미 저장된 CSV 행입니다.");
     }
 }
