@@ -169,3 +169,69 @@ mysql -u weekly_report -p weekly_report
 ```
 
 운영 실수 방지를 위해 `SELECT`로 대상 사용자를 확인한 뒤 `UPDATE`를 실행한다.
+
+## 9. MySQL 백업 절차
+
+백업 파일은 저장소 루트의 `backups/` 폴더에 보관한다. 이 폴더는 `.gitignore`에 포함되어 Git에 올라가지 않는다.
+
+백업 전에는 가능하면 사용자가 적은 시간대에 진행한다. MVP 단계에서는 짧은 점검 시간 동안 앱을 잠시 중지한 뒤 백업하는 방식을 권장한다.
+
+PowerShell 예시:
+
+```powershell
+cd C:\Users\Public\Documents\ESTsoft\CreatorTemp\metabuild-weekly-report-app
+New-Item -ItemType Directory -Force backups | Out-Null
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+mysqldump -u weekly_report -p `
+  --single-transaction `
+  --routines `
+  --triggers `
+  --default-character-set=utf8mb4 `
+  weekly_report `
+  > "backups\weekly_report-$timestamp.sql"
+```
+
+`-p` 뒤에 비밀번호를 직접 붙이지 않는다. 프롬프트가 뜨면 MySQL 비밀번호를 입력한다.
+
+백업 후 확인:
+
+```powershell
+Get-Item "backups\weekly_report-$timestamp.sql" | Select-Object Name, Length, LastWriteTime
+```
+
+파일 크기가 0이면 백업 실패로 보고 다시 수행한다.
+
+## 10. MySQL 복구 절차
+
+복구는 기존 DB를 덮어쓰는 작업이다. 반드시 현재 DB를 먼저 백업한 뒤 진행한다.
+
+복구 대상 DB를 비우고 다시 만든다. 운영 DB라면 앱을 먼저 중지한다.
+
+```powershell
+mysql -u root -p -e "DROP DATABASE IF EXISTS weekly_report; CREATE DATABASE weekly_report DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p -e "GRANT ALL PRIVILEGES ON weekly_report.* TO 'weekly_report'@'localhost'; FLUSH PRIVILEGES;"
+mysql -u weekly_report -p weekly_report < backups\weekly_report-백업시각.sql
+```
+
+복구 후 앱을 실행하고 다음을 확인한다.
+
+1. 로그인 가능 여부
+2. 업무 항목 목록 조회
+3. 제출 항목 조회
+4. 저장된 병합 결과 조회
+5. PL 권한 계정의 취합 화면 접근
+
+복구 검증용 SQL:
+
+```sql
+SELECT COUNT(*) AS user_count FROM users;
+SELECT COUNT(*) AS report_item_count FROM weekly_report_items;
+SELECT COUNT(*) AS merged_report_count FROM merged_reports;
+```
+
+## 11. 백업 운영 규칙
+
+- 실사용 기간에는 최소 하루 1회 백업한다.
+- 기능 변경 또는 배포 직전에는 수동 백업을 1회 만든다.
+- 최근 7일 백업은 보관하고, 오래된 파일은 외부 저장소로 옮기거나 삭제한다.
+- 비밀번호가 포함된 명령, dump 파일, 로컬 설정 파일은 Git에 커밋하지 않는다.

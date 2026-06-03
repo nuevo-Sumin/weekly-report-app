@@ -3,6 +3,7 @@ frontend/dist/
 target/
 .idea/
 data/
+backups/
 backend/config/application-local.yml
 backend/scripts/init-mysql.sql
 *.db
