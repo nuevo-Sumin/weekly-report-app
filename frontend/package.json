@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:spring": "vite build --outDir ../src/main/resources/static --emptyOutDir",
+    "build:spring": "vite build --outDir ../backend/src/main/resources/static --emptyOutDir",
     "test": "node src/csvReportImport.test.js && node src/dateUtils.test.js",
     "preview": "vite preview"
   },

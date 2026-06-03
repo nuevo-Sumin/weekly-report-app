@@ -7,7 +7,7 @@
 기본 실행은 H2 file DB를 사용한다.
 
 - DB 파일 위치: `./data/weekly_report`
-- JDBC URL: `jdbc:h2:file:./data/weekly_report;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE`
+- JDBC URL: `jdbc:h2:file:../data/weekly_report;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE` (`backend/`에서 실행할 때 루트 `data/`를 사용)
 - 서버를 꺼도 `data/` 폴더를 지우지 않으면 회원/보고 데이터가 유지된다.
 - `data/` 폴더는 `.gitignore`에 포함되어 GitHub에 올라가지 않는다.
 
@@ -17,7 +17,7 @@ MySQL 전환을 위해 `mysql` Spring profile을 추가했다.
 
 설정 파일:
 
-- `src/main/resources/application-mysql.yml`
+- `backend/src/main/resources/application-mysql.yml`
 
 사용 환경변수:
 
@@ -55,6 +55,7 @@ $env:SPRING_PROFILES_ACTIVE = "mysql"
 $env:MYSQL_USER = "weekly_report"
 $env:MYSQL_PASSWORD = "로컬비밀번호"
 $env:JWT_SECRET = "32바이트이상의로컬개발용JWT시크릿값을넣으세요"
+cd backend
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -130,7 +131,7 @@ H2 file DB를 직접 수정할 때는 앱을 먼저 종료한다.
 IntelliJ IDEA Database 도구에서 다음 값으로 연결한다.
 
 - Driver: H2
-- URL: `jdbc:h2:file:./data/weekly_report;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE`
+- URL: `jdbc:h2:file:../data/weekly_report;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE`
 - User: `sa`
 - Password: 없음
 
