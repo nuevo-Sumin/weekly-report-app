@@ -216,7 +216,7 @@ h3 {
 }
 
 .manual-form-row-primary {
-  grid-template-columns: minmax(120px, 0.7fr) minmax(140px, 0.75fr) minmax(280px, 2fr);
+  grid-template-columns: minmax(140px, 0.8fr) minmax(180px, 1fr) minmax(260px, 2fr);
 }
 
 .manual-execution-row {
