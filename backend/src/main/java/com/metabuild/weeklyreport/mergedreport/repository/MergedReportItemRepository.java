@@ -3,6 +3,7 @@ package com.metabuild.weeklyreport.mergedreport.repository;
 import com.metabuild.weeklyreport.mergedreport.entity.MergedReport;
 import com.metabuild.weeklyreport.mergedreport.entity.MergedReportItem;
 import com.metabuild.weeklyreport.mergedreport.entity.MergedReportStatus;
+import com.metabuild.weeklyreport.mergedreport.entity.MergeType;
 import com.metabuild.weeklyreport.reportitem.entity.WeeklyReportItem;
 import java.util.Collection;
 import java.util.List;
@@ -20,6 +21,8 @@ public interface MergedReportItemRepository extends JpaRepository<MergedReportIt
     void deleteByMergedReport(MergedReport mergedReport);
 
     boolean existsByReportItemAndMergedReportStatus(WeeklyReportItem reportItem, MergedReportStatus status);
+
+    boolean existsByReportItemInAndMergedReportMergeType(Collection<WeeklyReportItem> reportItems, MergeType mergeType);
 
     @Modifying
     @Query("""

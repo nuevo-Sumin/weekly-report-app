@@ -49,6 +49,25 @@ public class MergedReportService {
     public MergedReportResponse create(String loginId, MergedReportRequest request) {
         User createdBy = getUser(loginId);
         validateRequest(createdBy, request);
+        MergedReportStatus status = normalizeStatus(request.status());
+
+        if (status == MergedReportStatus.FINAL) {
+            List<MergedReport> finalReports = findFinalReports(createdBy, request);
+            if (!finalReports.isEmpty()) {
+                MergedReport existingFinalReport = finalReports.get(0);
+                validateFinalReportCanBeChanged(existingFinalReport);
+                existingFinalReport.update(
+                        request.mergeType(),
+                        request.reportStartDate(),
+                        request.reportEndDate(),
+                        request.mergedText().trim(),
+                        status
+                );
+                replaceSourceItems(existingFinalReport, createdBy, request.sourceItemIds());
+                demoteOtherFinalReports(createdBy, existingFinalReport);
+                return MergedReportResponse.from(existingFinalReport, getSourceItemIds(existingFinalReport));
+            }
+        }
 
         MergedReport report = new MergedReport(
                 createdBy,
@@ -56,11 +75,14 @@ public class MergedReportService {
                 request.reportStartDate(),
                 request.reportEndDate(),
                 request.mergedText().trim(),
-                normalizeStatus(request.status())
+                status
         );
 
         MergedReport savedReport = mergedReportRepository.save(report);
         replaceSourceItems(savedReport, createdBy, request.sourceItemIds());
+        if (status == MergedReportStatus.FINAL) {
+            demoteOtherFinalReports(createdBy, savedReport);
+        }
         return MergedReportResponse.from(savedReport, getSourceItemIds(savedReport));
     }
 
@@ -123,6 +145,7 @@ public class MergedReportService {
     public MergedReportResponse update(String loginId, Long reportId, MergedReportRequest request) {
         User createdBy = getUser(loginId);
         validateRequest(createdBy, request);
+        MergedReportStatus status = normalizeStatus(request.status());
 
         MergedReport report = mergedReportRepository.findByCreatedByAndId(createdBy, reportId)
                 .orElseThrow(() -> new EntityNotFoundException("병합 결과를 찾을 수 없습니다."));
@@ -130,18 +153,29 @@ public class MergedReportService {
         if (request.mergeType() != report.getMergeType()) {
             throw new IllegalArgumentException("병합 유형은 변경할 수 없습니다.");
         }
+        boolean cancelingFinalReport = report.getStatus() == MergedReportStatus.FINAL && status != MergedReportStatus.FINAL;
+        List<WeeklyReportItem> sourceItemsToCancel = cancelingFinalReport ? getSourceItems(report) : List.of();
+        if (report.getStatus() == MergedReportStatus.FINAL) {
+            validateFinalReportCanBeChanged(report);
+        }
         report.update(
                 request.mergeType(),
                 request.reportStartDate(),
                 request.reportEndDate(),
                 request.mergedText().trim(),
-                normalizeStatus(request.status())
+                status
         );
 
         if (request.sourceItemIds() != null) {
             replaceSourceItems(report, createdBy, request.sourceItemIds());
         } else {
             validateExistingSourceItems(createdBy, report);
+        }
+        if (status == MergedReportStatus.FINAL) {
+            demoteOtherFinalReports(createdBy, report);
+        }
+        if (cancelingFinalReport) {
+            sourceItemsToCancel.forEach(WeeklyReportItem::cancelSubmission);
         }
 
         return MergedReportResponse.from(report, getSourceItemIds(report));
@@ -170,6 +204,48 @@ public class MergedReportService {
 
     private MergedReportStatus normalizeStatus(MergedReportStatus status) {
         return status == null ? MergedReportStatus.SAVED : status;
+    }
+
+    private List<MergedReport> findFinalReports(User createdBy, MergedReportRequest request) {
+        return mergedReportRepository.findByCreatedByAndReportStartDateAndReportEndDateAndMergeTypeAndStatusOrderByUpdatedAtDesc(
+                createdBy,
+                request.reportStartDate(),
+                request.reportEndDate(),
+                request.mergeType(),
+                MergedReportStatus.FINAL
+        );
+    }
+
+    private void demoteOtherFinalReports(User createdBy, MergedReport currentFinalReport) {
+        mergedReportRepository.findByCreatedByAndReportStartDateAndReportEndDateAndMergeTypeAndStatusOrderByUpdatedAtDesc(
+                        createdBy,
+                        currentFinalReport.getReportStartDate(),
+                        currentFinalReport.getReportEndDate(),
+                        currentFinalReport.getMergeType(),
+                        MergedReportStatus.FINAL
+                )
+                .stream()
+                .filter(report -> !report.getId().equals(currentFinalReport.getId()))
+                .forEach(report -> report.changeStatus(MergedReportStatus.SAVED));
+    }
+
+    private void validateFinalReportCanBeChanged(MergedReport report) {
+        if (report.getMergeType() != MergeType.MEMBER) {
+            return;
+        }
+
+        List<WeeklyReportItem> sourceItems = getSourceItems(report);
+        if (!sourceItems.isEmpty()
+                && mergedReportItemRepository.existsByReportItemInAndMergedReportMergeType(sourceItems, MergeType.ADMIN)) {
+            throw new IllegalArgumentException("팀장 취합에 사용된 제출본은 취소하거나 수정할 수 없습니다.");
+        }
+    }
+
+    private List<WeeklyReportItem> getSourceItems(MergedReport report) {
+        return mergedReportItemRepository.findByMergedReportOrderByReportItemIdAsc(report)
+                .stream()
+                .map(MergedReportItem::getReportItem)
+                .toList();
     }
 
     private void replaceSourceItems(MergedReport report, User createdBy, List<Long> sourceItemIds) {

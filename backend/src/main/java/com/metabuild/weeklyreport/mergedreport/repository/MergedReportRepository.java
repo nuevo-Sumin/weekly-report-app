@@ -24,6 +24,14 @@ public interface MergedReportRepository extends JpaRepository<MergedReport, Long
             MergeType mergeType
     );
 
+    List<MergedReport> findByCreatedByAndReportStartDateAndReportEndDateAndMergeTypeAndStatusOrderByUpdatedAtDesc(
+            User createdBy,
+            LocalDate reportStartDate,
+            LocalDate reportEndDate,
+            MergeType mergeType,
+            MergedReportStatus status
+    );
+
     Optional<MergedReport> findByCreatedByAndId(User createdBy, Long id);
 
     List<MergedReport> findByReportStartDateAndReportEndDateAndMergeTypeAndStatusOrderByUpdatedAtDesc(

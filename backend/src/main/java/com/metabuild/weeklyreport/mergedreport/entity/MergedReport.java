@@ -85,6 +85,10 @@ public class MergedReport {
         this.status = status;
     }
 
+    public void changeStatus(MergedReportStatus status) {
+        this.status = status;
+    }
+
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();

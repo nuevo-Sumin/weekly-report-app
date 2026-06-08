@@ -606,6 +606,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
 
     setIsLoading(true);
     setMessage('');
+    const wasFinalMergedReport = isFinalMergedReport;
 
     try {
       if (status === 'FINAL') {
@@ -625,7 +626,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       const path = mergedReportId ? `/api/merged-reports/${mergedReportId}` : '/api/merged-reports';
       const method = mergedReportId ? 'PUT' : 'POST';
       const data = await requestApi(path, { method, body, token });
-      if (status === 'FINAL') {
+      if (status === 'FINAL' || wasFinalMergedReport) {
         await loadReportItems();
       }
       setMergedReportId(data.id);
@@ -635,7 +636,13 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       setSelectedIds(data.sourceItemIds ?? selectedIds);
       setCopySucceeded(false);
       await loadMergedReports();
-      setMessage(status === 'FINAL' ? '최종병합 내용을 관리자 페이지로 제출했습니다.' : (mergedReportId ? '병합 결과를 수정 저장했습니다.' : '병합 결과를 저장했습니다.'));
+      if (status === 'FINAL') {
+        setMessage(mergedReportStatus === 'SAVED' ? '최종병합 내용을 다시 제출했습니다.' : '최종병합 내용을 관리자 페이지로 제출했습니다.');
+      } else if (wasFinalMergedReport) {
+        setMessage('제출을 취소했습니다. 내용을 수정한 뒤 다시 제출할 수 있습니다.');
+      } else {
+        setMessage(mergedReportId ? '병합 결과를 수정 저장했습니다.' : '병합 결과를 저장했습니다.');
+      }
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -1094,8 +1101,8 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               목록 새로고침
             </button>
             {isFinalMergedReportLocked ? (
-              <button className="secondary-button" type="button" onClick={() => setIsMergedReportEditing(true)} disabled={isLoading}>
-                수정
+              <button className="secondary-button" type="button" onClick={() => saveMergedReport('SAVED')} disabled={isLoading}>
+                제출 취소
               </button>
             ) : !isFinalMergedReport ? (
               <button className="secondary-button" type="button" onClick={() => saveMergedReport('SAVED')} disabled={(!mergedReportId && selectedIds.length === 0) || !activeMergedText.trim() || isLoading}>
@@ -1103,7 +1110,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               </button>
             ) : null}
             <button className="primary-button compact" type="button" onClick={() => saveMergedReport('FINAL')} disabled={!canPersistMergedReport || isFinalMergedReportLocked}>
-              {isFinalMergedReport ? '다시 제출' : '제출'}
+              {mergedReportId ? '재제출' : '제출'}
             </button>
             <button className="danger-button compact" type="button" onClick={deleteCurrentItems} disabled={selectedIds.length === 0 || isLoading || isFinalMergedReport}>
               현재 항목 삭제

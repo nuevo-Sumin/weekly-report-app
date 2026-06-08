@@ -190,6 +190,14 @@ public class WeeklyReportItem {
         this.submittedAt = submittedAt;
     }
 
+    public void cancelSubmission() {
+        if (this.saveStatus != SaveStatus.SUBMITTED) {
+            return;
+        }
+        this.saveStatus = SaveStatus.SAVED;
+        this.submittedAt = null;
+    }
+
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();

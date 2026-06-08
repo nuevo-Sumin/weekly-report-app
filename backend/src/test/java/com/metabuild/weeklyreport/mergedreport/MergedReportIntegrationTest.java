@@ -1,5 +1,6 @@
 package com.metabuild.weeklyreport.mergedreport;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -92,6 +93,69 @@ class MergedReportIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.mergedText").value("수정된 최종 텍스트"))
                 .andExpect(jsonPath("$.data.status").value("FINAL"));
+    }
+
+    @Test
+    void userFinalMergedReportIsReusedPerReportPeriod() throws Exception {
+        String token = signupAndLogin("singlefinalmember");
+        Long firstFinalId = createMergedReport(token, memberRequest("첫 제출", MergedReportStatus.FINAL));
+
+        mockMvc.perform(post("/api/merged-reports")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(memberRequest("수정 제출", MergedReportStatus.FINAL))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value(firstFinalId))
+                .andExpect(jsonPath("$.data.mergedText").value("수정 제출"))
+                .andExpect(jsonPath("$.data.status").value("FINAL"));
+
+        mockMvc.perform(get("/api/merged-reports")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .param("reportStartDate", REPORT_START_DATE.toString())
+                        .param("reportEndDate", REPORT_END_DATE.toString())
+                        .param("mergeType", "MEMBER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(firstFinalId));
+    }
+
+    @Test
+    void userCanCancelFinalMergedReportBeforeAdminAggregation() throws Exception {
+        User user = createUser("cancelfinalmember", UserRole.USER);
+        WeeklyReportItem item = createReportItem(user, "Cancel Final Source", SaveStatus.SUBMITTED);
+        String token = login("cancelfinalmember");
+        Long reportId = createMergedReport(token, memberRequest("제출본", MergedReportStatus.FINAL, List.of(item.getId())));
+
+        mockMvc.perform(put("/api/merged-reports/{reportId}", reportId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(memberRequest("제출 취소본", MergedReportStatus.SAVED, List.of(item.getId())))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(reportId))
+                .andExpect(jsonPath("$.data.status").value("SAVED"))
+                .andExpect(jsonPath("$.data.mergedText").value("제출 취소본"));
+
+        assertThat(reportItemRepository.findById(item.getId()).orElseThrow().getSaveStatus()).isEqualTo(SaveStatus.SAVED);
+    }
+
+    @Test
+    void userCannotCancelFinalMergedReportAfterAdminAggregation() throws Exception {
+        User user = createUser("lockedfinalmember", UserRole.USER);
+        WeeklyReportItem item = createReportItem(user, "Locked Final Source", SaveStatus.SUBMITTED);
+        String userToken = login("lockedfinalmember");
+        String managerToken = createManagerAndLogin("lockedfinalmanager");
+        Long reportId = createMergedReport(userToken, memberRequest("팀장 취합 전 제출본", MergedReportStatus.FINAL, List.of(item.getId())));
+
+        createMergedReport(managerToken, adminRequest("팀장 취합본", MergedReportStatus.SAVED, List.of(item.getId())));
+
+        mockMvc.perform(put("/api/merged-reports/{reportId}", reportId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(memberRequest("제출 취소 시도", MergedReportStatus.SAVED, List.of(item.getId())))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+
+        assertThat(reportItemRepository.findById(item.getId()).orElseThrow().getSaveStatus()).isEqualTo(SaveStatus.SUBMITTED);
     }
 
     @Test
@@ -337,6 +401,17 @@ class MergedReportIntegrationTest {
         );
     }
 
+    private MergedReportRequest memberRequest(String mergedText, MergedReportStatus status, List<Long> sourceItemIds) {
+        return new MergedReportRequest(
+                MergeType.MEMBER,
+                REPORT_START_DATE,
+                REPORT_END_DATE,
+                mergedText,
+                status,
+                sourceItemIds
+        );
+    }
+
     private MergedReportRequest adminRequest(String mergedText, MergedReportStatus status) {
         return new MergedReportRequest(
                 MergeType.ADMIN,
@@ -344,6 +419,17 @@ class MergedReportIntegrationTest {
                 REPORT_END_DATE,
                 mergedText,
                 status
+        );
+    }
+
+    private MergedReportRequest adminRequest(String mergedText, MergedReportStatus status, List<Long> sourceItemIds) {
+        return new MergedReportRequest(
+                MergeType.ADMIN,
+                REPORT_START_DATE,
+                REPORT_END_DATE,
+                mergedText,
+                status,
+                sourceItemIds
         );
     }
 
