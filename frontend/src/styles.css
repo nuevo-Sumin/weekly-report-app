@@ -208,6 +208,42 @@ h3 {
   );
 }
 
+.manual-form-row {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 14px;
+  align-items: end;
+}
+
+.manual-form-row-primary {
+  grid-template-columns: minmax(120px, 0.7fr) minmax(140px, 0.75fr) minmax(280px, 2fr);
+}
+
+.manual-execution-row {
+  grid-template-columns: minmax(220px, 1.5fr) minmax(140px, 0.8fr) minmax(180px, 1fr);
+}
+
+.manual-execution-row.compact {
+  grid-template-columns: minmax(220px, 1.5fr) minmax(140px, 0.8fr);
+}
+
+.manual-business-status-row {
+  grid-template-columns: minmax(140px, 0.8fr) minmax(180px, 1fr);
+  justify-content: start;
+}
+
+.manual-business-status-row.with-custom {
+  grid-template-columns: minmax(260px, 2fr) minmax(140px, 0.8fr) minmax(180px, 1fr);
+}
+
+.manual-business-status-row.compact {
+  grid-template-columns: minmax(140px, 0.8fr);
+}
+
+.manual-business-status-row.with-custom.compact {
+  grid-template-columns: minmax(260px, 2fr) minmax(140px, 0.8fr);
+}
+
 .auth-form label,
 .report-form label,
 .period-grid label {
@@ -1050,6 +1086,7 @@ textarea:focus {
   .report-layout,
   .manager-layout,
   .report-form,
+  .manual-form-row,
   .period-grid,
   .filter-grid {
     grid-template-columns: 1fr;

@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildIssueUrl,
+  businessManagementTaskOptions,
   categoryLabels,
   compareReportItemsByUnitTask,
   csvWeekSelectionLabels,
   initialReportForm,
+  manualWeekSelectionLabels,
   normalizeReportItemUnitTask,
   normalizeUnitTaskName,
   statusLabels,
+  unitTaskOrder,
   weekTypeLabels,
 } from '../constants';
 import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
@@ -111,7 +114,33 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   }, [csvModalOpen]);
 
   function updateReportForm(field, value) {
-    setReportForm((current) => ({ ...current, [field]: value }));
+    setReportForm((current) => {
+      if (field === 'category') {
+        return {
+          ...current,
+          category: value,
+          unitTask: value === 'BUSINESS_MANAGEMENT' ? '' : (current.unitTask || unitTaskOrder[0]),
+          title: value === 'BUSINESS_MANAGEMENT' ? '' : current.title,
+          businessTaskOption: value === 'BUSINESS_MANAGEMENT' ? current.businessTaskOption : '',
+          businessTaskCustomTitle: value === 'BUSINESS_MANAGEMENT' ? current.businessTaskCustomTitle : '',
+        };
+      }
+      if (field === 'status') {
+        return {
+          ...current,
+          status: value,
+          dueDate: value === 'IN_PROGRESS' ? current.dueDate : '',
+        };
+      }
+      if (field === 'businessTaskOption') {
+        return {
+          ...current,
+          businessTaskOption: value,
+          businessTaskCustomTitle: value === '기타' ? current.businessTaskCustomTitle : '',
+        };
+      }
+      return { ...current, [field]: value };
+    });
   }
 
   function updateCsvRow(tempId, field, value) {
@@ -442,30 +471,47 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
     setMessage('');
 
     try {
-      const detailContent = reportForm.detailContent?.trim() || reportForm.title;
-      const body = {
+      const manualTitle = reportForm.category === 'BUSINESS_MANAGEMENT'
+        ? (
+            reportForm.businessTaskOption === '기타'
+              ? reportForm.businessTaskCustomTitle.trim()
+              : reportForm.businessTaskOption
+          )
+        : reportForm.title.trim();
+      if (!manualTitle) {
+        setMessage('세부사항을 입력해 주세요.');
+        return;
+      }
+
+      const completed = reportForm.status === 'DONE';
+      const weekTypes = reportForm.weekType === 'ALL' ? ['THIS_WEEK', 'NEXT_WEEK'] : [reportForm.weekType];
+      const detailContent = reportForm.detailContent?.trim() || manualTitle;
+      const buildBody = (weekType) => ({
         reportStartDate: weekRange.startDate,
         reportEndDate: weekRange.endDate,
-        weekType: reportForm.weekType,
+        weekType,
         category: reportForm.category,
         unitTask: reportForm.category === 'BUSINESS_MANAGEMENT' ? '사업관리' : normalizeUnitTaskName(reportForm.unitTask),
-        title: reportForm.title,
+        title: manualTitle,
         detailContent,
-        progressContent: reportForm.progressContent?.trim() || reportForm.title,
-        status: reportForm.completed ? 'DONE' : reportForm.status,
-        progressRate: Number(reportForm.progressRate),
-        dueDate: reportForm.dueDate || null,
-        completed: reportForm.completed,
+        progressContent: reportForm.progressContent?.trim() || manualTitle,
+        status: reportForm.status,
+        progressRate: completed ? 100 : Number(reportForm.progressRate),
+        dueDate: reportForm.status === 'IN_PROGRESS' ? (reportForm.dueDate || null) : null,
+        completed,
         saveStatus,
-      };
-      const path = reportForm.id ? `/api/report-items/${reportForm.id}` : '/api/report-items';
-      const method = reportForm.id ? 'PUT' : 'POST';
-      const data = await requestApi(path, { method, body, token });
+      });
+      const savedItems = [];
+      for (const weekType of weekTypes) {
+        const data = await requestApi('/api/report-items', { method: 'POST', body: buildBody(weekType), token });
+        savedItems.push(data);
+      }
       setReportForm(initialReportForm);
-      setMessage(saveStatus === 'DRAFT' ? '임시저장되었습니다.' : '저장되었습니다.');
+      const savedCountLabel = savedItems.length > 1 ? ` ${savedItems.length}건` : '';
+      setMessage(saveStatus === 'DRAFT' ? `임시저장되었습니다.${savedCountLabel}` : `저장되었습니다.${savedCountLabel}`);
       await loadReportItems();
       if (saveStatus === 'SAVED') {
-        setSelectedIds((current) => [...new Set([...current, data.id])]);
+        setSelectedIds((current) => [...new Set([...current, ...savedItems.map((item) => item.id)])]);
         setMergedReportId(null);
         setMergedText(null);
         setMergedReportStatus(null);
@@ -503,24 +549,6 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
       });
     }
     return true;
-  }
-
-  function editReportItem(item) {
-    setInputMode('MANUAL');
-    setReportForm({
-      id: item.id,
-      weekType: item.weekType,
-      category: item.category ?? 'EXECUTION',
-      unitTask: item.unitTask,
-      title: item.title,
-      detailContent: item.detailContent,
-      progressContent: item.progressContent,
-      status: item.status,
-      progressRate: item.progressRate,
-      dueDate: item.dueDate ?? '',
-      completed: item.completed,
-    });
-    setMessage('선택한 항목을 수정 모드로 불러왔습니다.');
   }
 
   function toggleSelected(id) {
@@ -735,7 +763,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </button>
           </div>
           <p className="helper-text">
-            CSV는 원본 PMS 파일 기준으로 읽고, 완료 항목은 완료일이 보고 기간 안에 있는 경우만 가져옵니다.
+            Redmine에서 전체 컬럼 내보내기 한 CSV파일을 올려주세요. 완료 항목은 완료일이 보고 기간 사이일 때만 표시합니다.
           </p>
 
           {hasCsvImportState && (
@@ -922,82 +950,133 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
 
         {inputMode === 'MANUAL' && (
         <form className="report-form" onSubmit={handleReportSubmit}>
-          <label>
-            주차 구분
-            <select
-              value={reportForm.weekType}
-              onChange={(event) => updateReportForm('weekType', event.target.value)}
-            >
-              <option value="THIS_WEEK">금주</option>
-              <option value="NEXT_WEEK">차주</option>
-            </select>
-          </label>
-          <label>
-            업무 구분
-            <select
-              value={reportForm.category}
-              onChange={(event) => updateReportForm('category', event.target.value)}
-            >
-              {Object.entries(categoryLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </label>
+          <div className="manual-form-row manual-form-row-primary">
+            <label>
+              주차 구분
+              <select
+                value={reportForm.weekType}
+                onChange={(event) => updateReportForm('weekType', event.target.value)}
+              >
+                {Object.entries(manualWeekSelectionLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              업무 구분
+              <select
+                value={reportForm.category}
+                onChange={(event) => updateReportForm('category', event.target.value)}
+              >
+                {Object.entries(categoryLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              세부사항
+              {reportForm.category === 'BUSINESS_MANAGEMENT' ? (
+                <select
+                  value={reportForm.businessTaskOption}
+                  onChange={(event) => updateReportForm('businessTaskOption', event.target.value)}
+                  required
+                >
+                  {businessManagementTaskOptions.map((option) => (
+                    <option key={option || 'empty-business-task'} value={option}>{option || '선택'}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={reportForm.title}
+                  onChange={(event) => updateReportForm('title', event.target.value)}
+                  placeholder="업무 제목"
+                  required
+                />
+              )}
+            </label>
+          </div>
           {reportForm.category === 'EXECUTION' && (
-          <label>
-            단위업무
-            <input
-              value={reportForm.unitTask}
-              onChange={(event) => updateReportForm('unitTask', event.target.value)}
-              placeholder="예: 공통"
-              required
-            />
-          </label>
+            <div className={`manual-form-row manual-execution-row${reportForm.status === 'IN_PROGRESS' ? '' : ' compact'}`}>
+              <label>
+                단위업무
+                <select
+                  value={reportForm.unitTask}
+                  onChange={(event) => updateReportForm('unitTask', event.target.value)}
+                  required
+                >
+                  {unitTaskOrder.map((unitTask) => (
+                    <option key={unitTask} value={unitTask}>{unitTask}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                상태
+                <select
+                  value={reportForm.status}
+                  onChange={(event) => updateReportForm('status', event.target.value)}
+                >
+                  <option value="NEW">신규</option>
+                  <option value="IN_PROGRESS">진행중</option>
+                  <option value="DONE">완료</option>
+                  <option value="HOLD">보류</option>
+                </select>
+              </label>
+              {reportForm.status === 'IN_PROGRESS' && (
+                <label>
+                  완료기한
+                  <input
+                    type="date"
+                    value={reportForm.dueDate}
+                    onChange={(event) => updateReportForm('dueDate', event.target.value)}
+                  />
+                </label>
+              )}
+            </div>
           )}
-          <label>
-            세부사항
-            <input
-              value={reportForm.title}
-              onChange={(event) => updateReportForm('title', event.target.value)}
-              placeholder="업무 제목"
-              required
-            />
-          </label>
-          <label>
-            상태
-            <select
-              value={reportForm.status}
-              onChange={(event) => updateReportForm('status', event.target.value)}
-            >
-              <option value="NEW">신규</option>
-              <option value="IN_PROGRESS">진행중</option>
-              <option value="DONE">완료</option>
-              <option value="HOLD">보류</option>
-            </select>
-          </label>
-          <label>
-            완료기한
-            <input
-              type="date"
-              value={reportForm.dueDate}
-              onChange={(event) => updateReportForm('dueDate', event.target.value)}
-            />
-          </label>
-          <label className="check-label align-end">
-            <input
-              type="checkbox"
-              checked={reportForm.completed}
-              onChange={(event) => updateReportForm('completed', event.target.checked)}
-            />
-            완료여부
-          </label>
+          {reportForm.category === 'BUSINESS_MANAGEMENT' && (
+            <div className={`manual-form-row manual-business-status-row${reportForm.businessTaskOption === '기타' ? ' with-custom' : ''}${reportForm.status === 'IN_PROGRESS' ? '' : ' compact'}`}>
+              {reportForm.businessTaskOption === '기타' && (
+                <label>
+                  기타 세부사항
+                  <input
+                    value={reportForm.businessTaskCustomTitle}
+                    onChange={(event) => updateReportForm('businessTaskCustomTitle', event.target.value)}
+                    placeholder="사업관리 세부사항 입력"
+                    required
+                  />
+                </label>
+              )}
+              <label>
+                상태
+                <select
+                  value={reportForm.status}
+                  onChange={(event) => updateReportForm('status', event.target.value)}
+                >
+                  <option value="NEW">신규</option>
+                  <option value="IN_PROGRESS">진행중</option>
+                  <option value="DONE">완료</option>
+                  <option value="HOLD">보류</option>
+                </select>
+              </label>
+              {reportForm.status === 'IN_PROGRESS' && (
+                <label>
+                  완료기한
+                  <input
+                    type="date"
+                    value={reportForm.dueDate}
+                    onChange={(event) => updateReportForm('dueDate', event.target.value)}
+                  />
+                </label>
+              )}
+            </div>
+          )}
 
           <div className="button-row wide-field">
             <button className="secondary-button" type="submit" name="saveStatus" value="DRAFT" disabled={isLoading}>
               임시저장
             </button>
             <button className="primary-button compact" type="submit" name="saveStatus" value="SAVED" disabled={isLoading}>
-              {reportForm.id ? '수정 저장' : '저장'}
+              저장
             </button>
           </div>
         </form>

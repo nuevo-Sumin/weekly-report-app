@@ -19,17 +19,17 @@ export const initialFindForm = {
 };
 
 export const initialReportForm = {
-  id: null,
   weekType: 'THIS_WEEK',
   category: 'BUSINESS_MANAGEMENT',
   unitTask: '',
+  businessTaskOption: '',
+  businessTaskCustomTitle: '',
   title: '',
   detailContent: '',
   progressContent: '',
   status: 'IN_PROGRESS',
   progressRate: 0,
   dueDate: '',
-  completed: false,
 };
 
 export const statusLabels = {
@@ -44,6 +44,12 @@ export const weekTypeLabels = {
   NEXT_WEEK: '차주',
 };
 
+export const manualWeekSelectionLabels = {
+  ALL: '모두',
+  THIS_WEEK: '금주',
+  NEXT_WEEK: '차주',
+};
+
 export const csvWeekSelectionLabels = {
   THIS_WEEK: '금주',
   NEXT_WEEK: '차주',
@@ -54,6 +60,15 @@ export const categoryLabels = {
   BUSINESS_MANAGEMENT: '사업관리',
   EXECUTION: '수행',
 };
+
+export const businessManagementTaskOptions = [
+  '',
+  '안전망 공지 검토 요청 및 검토완료 공지 게시',
+  '월간보고자료 작성 및 제출',
+  '주간보고자료 작성 및 제출',
+  '휴가사용내역서 작성',
+  '기타',
+];
 
 export const unitTaskOrder = [
   '공통',
