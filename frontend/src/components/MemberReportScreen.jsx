@@ -1041,18 +1041,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             </div>
           )}
           {reportForm.category === 'BUSINESS_MANAGEMENT' && (
-            <div className={`manual-form-row manual-business-status-row${reportForm.businessTaskOption === '기타' ? ' with-custom' : ''}${reportForm.status === 'IN_PROGRESS' ? '' : ' compact'}`}>
-              {reportForm.businessTaskOption === '기타' && (
-                <label>
-                  기타 세부사항
-                  <input
-                    value={reportForm.businessTaskCustomTitle}
-                    onChange={(event) => updateReportForm('businessTaskCustomTitle', event.target.value)}
-                    placeholder="사업관리 세부사항 입력"
-                    required
-                  />
-                </label>
-              )}
+            <div className="manual-form-row manual-business-status-row">
               <label>
                 상태
                 <select
@@ -1065,7 +1054,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                   <option value="HOLD">보류</option>
                 </select>
               </label>
-              {reportForm.status === 'IN_PROGRESS' && (
+              {reportForm.status === 'IN_PROGRESS' ? (
                 <label>
                   완료기한
                   <input
@@ -1074,6 +1063,21 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                     onChange={(event) => updateReportForm('dueDate', event.target.value)}
                   />
                 </label>
+              ) : (
+                <div className="manual-form-placeholder" aria-hidden="true" />
+              )}
+              {reportForm.businessTaskOption === '기타' ? (
+                <label>
+                  기타 세부사항
+                  <input
+                    value={reportForm.businessTaskCustomTitle}
+                    onChange={(event) => updateReportForm('businessTaskCustomTitle', event.target.value)}
+                    placeholder="사업관리 세부사항 입력"
+                    required
+                  />
+                </label>
+              ) : (
+                <div className="manual-form-placeholder" aria-hidden="true" />
               )}
             </div>
           )}
