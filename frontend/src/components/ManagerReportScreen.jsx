@@ -7,8 +7,8 @@ import {
   statusLabels,
   weekTypeLabels,
 } from '../constants';
-import { formatDate, getWeekRange, toDateInputValue } from '../dateUtils';
-import { buildAdminPreview, formatReportItemDueLabel } from '../reportPreview';
+import { formatDate, getPreviousWeekRange, getWeekRange, toDateInputValue } from '../dateUtils';
+import { buildAdminPreview, extractWeekSection, formatReportItemDueLabel } from '../reportPreview';
 import { requestApi } from '../api';
 
 const initialFilters = {
@@ -22,6 +22,8 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   const latestRequestId = useRef(0);
   const latestMergedReportsRequestId = useRef(0);
   const latestMemberMergedReportsRequestId = useRef(0);
+  const weekComparisonModalRef = useRef(null);
+  const weekComparisonCloseButtonRef = useRef(null);
   const [filters, setFilters] = useState(initialFilters);
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -29,10 +31,14 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
   const [mergedReportId, setMergedReportId] = useState(null);
   const [savedMergedReports, setSavedMergedReports] = useState([]);
   const [submittedMemberReports, setSubmittedMemberReports] = useState([]);
+  const [weekComparisonOpen, setWeekComparisonOpen] = useState(false);
+  const [weekComparison, setWeekComparison] = useState(null);
   const [copySucceeded, setCopySucceeded] = useState(false);
 
   const weekRange = useMemo(() => getWeekRange(today), [today]);
+  const previousWeekRange = useMemo(() => getPreviousWeekRange(today), [today]);
   const automaticPreview = useMemo(() => buildAdminPreview(items, selectedIds), [items, selectedIds]);
+  const activeMergedText = mergedText ?? automaticPreview;
   const hiddenSelectedCount = useMemo(
     () => selectedIds.filter((id) => !items.some((item) => item.id === id)).length,
     [items, selectedIds],
@@ -47,6 +53,46 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
       loadSubmittedMemberReports();
     }
   }, [token, weekRange.startDate, weekRange.endDate]);
+
+  useEffect(() => {
+    if (!weekComparisonOpen) {
+      return undefined;
+    }
+
+    weekComparisonCloseButtonRef.current?.focus();
+
+    function handleModalKeyDown(event) {
+      if (event.key === 'Escape') {
+        setWeekComparisonOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusableElements = weekComparisonModalRef.current?.querySelectorAll(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+      );
+      const focusableList = Array.from(focusableElements ?? []);
+      if (focusableList.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableList[0];
+      const lastElement = focusableList[focusableList.length - 1];
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener('keydown', handleModalKeyDown);
+    return () => document.removeEventListener('keydown', handleModalKeyDown);
+  }, [weekComparisonOpen]);
 
   function updateFilter(field, value) {
     setFilters((current) => ({ ...current, [field]: value }));
@@ -212,6 +258,56 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
     setMergedReportId(null);
     setCopySucceeded(false);
     setSelectedIds(allVisibleItemsSelected ? [] : items.map((item) => item.id));
+  }
+
+  async function openPreviousAdminComparison() {
+    const currentMergedSnapshot = activeMergedText;
+    setIsLoading(true);
+    setMessage('');
+
+    try {
+      const query = new URLSearchParams({
+        reportStartDate: previousWeekRange.startDate,
+        reportEndDate: previousWeekRange.endDate,
+        mergeType: 'ADMIN',
+      });
+      const previousReports = await requestApi(`/api/merged-reports?${query.toString()}`, {
+        method: 'GET',
+        token,
+      });
+      const previousAdminReport = previousReports[0] ?? null;
+      const currentThisWeek = extractWeekSection(currentMergedSnapshot, 'THIS_WEEK');
+
+      if (!previousAdminReport) {
+        setWeekComparison({
+          previousRange: previousWeekRange,
+          currentRange: weekRange,
+          previousUpdatedAt: null,
+          previousText: '',
+          previousSectionFound: true,
+          currentText: currentThisWeek.text,
+          currentSectionFound: currentThisWeek.found,
+        });
+        setWeekComparisonOpen(true);
+        return;
+      }
+
+      const previousNextWeek = extractWeekSection(previousAdminReport.mergedText, 'NEXT_WEEK');
+      setWeekComparison({
+        previousRange: previousWeekRange,
+        currentRange: weekRange,
+        previousUpdatedAt: previousAdminReport.updatedAt,
+        previousText: previousNextWeek.text,
+        previousSectionFound: previousNextWeek.found,
+        currentText: currentThisWeek.text,
+        currentSectionFound: currentThisWeek.found,
+      });
+      setWeekComparisonOpen(true);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function saveMergedReport() {
@@ -437,6 +533,9 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
             <button className="secondary-button" type="button" onClick={loadSubmittedMemberReports} disabled={isLoading}>
               제출본 새로고침
             </button>
+            <button className="secondary-button" type="button" onClick={openPreviousAdminComparison} disabled={isLoading}>
+              전주 취합 비교
+            </button>
             <button className="secondary-button" type="button" onClick={saveMergedReport} disabled={!mergedText?.trim() || isLoading}>
               {mergedReportId ? '수정 저장' : '저장'}
             </button>
@@ -487,7 +586,7 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
         </div>
         <textarea
           className="preview-editor"
-          value={mergedText ?? automaticPreview}
+          value={activeMergedText}
           onChange={(event) => {
             setMergedText(event.target.value);
             setCopySucceeded(false);
@@ -495,6 +594,73 @@ function ManagerReportScreen({ token, isLoading, setIsLoading, setMessage }) {
           aria-label="팀장 취합 최종 텍스트"
         />
       </section>
+
+      {weekComparisonOpen && weekComparison && (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="csv-modal comparison-modal"
+            ref={weekComparisonModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-week-comparison-title"
+          >
+            <div className="csv-modal-header">
+              <div>
+                <p className="panel-label">전주 취합 비교</p>
+                <h3 id="admin-week-comparison-title">팀 전주 계획과 현재 금주 취합 비교</h3>
+              </div>
+              <button
+                className="secondary-button icon-button"
+                type="button"
+                ref={weekComparisonCloseButtonRef}
+                onClick={() => setWeekComparisonOpen(false)}
+                aria-label="전주 취합 비교 닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="week-comparison-grid">
+              <section className="comparison-column" aria-label="전주 관리자 취합의 차주 내용">
+                <div className="comparison-column-header">
+                  <strong>전주 관리자 취합의 차주</strong>
+                  <span>
+                    {formatDate(weekComparison.previousRange.startDate)} ~ {formatDate(weekComparison.previousRange.endDate)}
+                  </span>
+                </div>
+                {!weekComparison.previousSectionFound && (
+                  <p className="comparison-note">[차주] 구분을 찾지 못해 전주 관리자 취합 전체 내용을 표시합니다.</p>
+                )}
+                <pre className="comparison-text">{weekComparison.previousText || '전주 관리자 취합 결과가 없습니다.'}</pre>
+              </section>
+
+              <section className="comparison-column" aria-label="현재 관리자 취합 금주 내용">
+                <div className="comparison-column-header">
+                  <strong>현재 관리자 취합/선택항목 금주</strong>
+                  <span>
+                    {formatDate(weekComparison.currentRange.startDate)} ~ {formatDate(weekComparison.currentRange.endDate)}
+                  </span>
+                </div>
+                {!weekComparison.currentSectionFound && (
+                  <p className="comparison-note">[금주] 구분을 찾지 못해 현재 취합 텍스트 전체 내용을 표시합니다.</p>
+                )}
+                <pre className="comparison-text">{weekComparison.currentText || '현재 금주 비교 대상이 없습니다.'}</pre>
+              </section>
+            </div>
+
+            <div className="comparison-footer">
+              <span>
+                {weekComparison.previousUpdatedAt
+                  ? `전주 관리자 취합 수정일 ${formatDate(weekComparison.previousUpdatedAt.slice(0, 10))}`
+                  : '전주 관리자 취합 결과가 없습니다.'}
+              </span>
+              <button className="primary-button compact" type="button" onClick={() => setWeekComparisonOpen(false)}>
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
