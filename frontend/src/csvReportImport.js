@@ -8,6 +8,7 @@ const headerAliases = {
   status: ['상태'],
   progressRate: ['진척도', '진행률'],
   dueDate: ['완료기한'],
+  dueRequestDate: ['완료요청일', '완료 요청일'],
   completedDate: ['완료일'],
   completed: ['완료여부'],
 };
@@ -147,8 +148,12 @@ function parseDateField(rawDate, rowNumber, fieldLabel) {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
-function parseDueDate(rawDueDate, rowNumber) {
-  return parseDateField(rawDueDate, rowNumber, '완료기한');
+function parseDueDate(rawDueDate, rawDueRequestDate, rowNumber) {
+  const dueDate = String(rawDueDate ?? '').trim();
+  if (dueDate) {
+    return parseDateField(dueDate, rowNumber, '완료기한');
+  }
+  return parseDateField(rawDueRequestDate, rowNumber, '완료요청일');
 }
 
 function parseCompletedDate(rawCompletedDate, rowNumber) {
@@ -206,7 +211,11 @@ export function parseReportCsvWithErrors(text) {
         progressContent: indexes.progressContent >= 0 ? (row[indexes.progressContent]?.trim() || title) : title,
         status,
         progressRate,
-        dueDate: indexes.dueDate >= 0 ? parseDueDate(row[indexes.dueDate], rowNumber) : '',
+        dueDate: parseDueDate(
+          indexes.dueDate >= 0 ? row[indexes.dueDate] : '',
+          indexes.dueRequestDate >= 0 ? row[indexes.dueRequestDate] : '',
+          rowNumber
+        ),
         completedDate: indexes.completedDate >= 0 ? parseCompletedDate(row[indexes.completedDate], rowNumber) : '',
         completed: parseCompleted(row[indexes.completed], status, progressRate),
       });

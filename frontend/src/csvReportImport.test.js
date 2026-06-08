@@ -69,6 +69,27 @@ const mixedCsv = [
 }
 
 {
+  const dueRequestCsv = [
+    '#,제목,상태,범주,진척도,완료기한,완료요청일',
+    '1,완료기한 우선,진행중,공통,50,2026-06-05,2026-06-10',
+    '2,요청일 대체,진행중,공통,50,,2026-06-11',
+  ].join('\n');
+  const rows = parseReportCsv(dueRequestCsv);
+
+  assert.deepEqual(rows.map((row) => row.dueDate), ['2026-06-05', '2026-06-11']);
+}
+
+{
+  const dueRequestOnlyCsv = [
+    '#,제목,상태,범주,진척도,완료요청일',
+    '1,요청일만 있음,진행중,공통,50,2026-06-12',
+  ].join('\n');
+  const rows = parseReportCsv(dueRequestOnlyCsv);
+
+  assert.equal(rows[0].dueDate, '2026-06-12');
+}
+
+{
   assert.throws(
     () => parseReportCsv(mixedCsv),
     /3행의 제목이 비어 있습니다\./
