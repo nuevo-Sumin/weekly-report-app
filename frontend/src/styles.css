@@ -826,6 +826,68 @@ textarea:focus {
   overflow: auto;
 }
 
+.comparison-modal {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.week-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-height: 0;
+  padding: 18px 0;
+}
+
+.comparison-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.comparison-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  color: var(--olive);
+}
+
+.comparison-column-header span,
+.comparison-footer,
+.comparison-note {
+  color: var(--muted-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.comparison-note {
+  margin: 0 0 8px;
+}
+
+.comparison-text {
+  flex: 1 1 auto;
+  min-height: 320px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--stone);
+  border-radius: 8px;
+  background: var(--notice-surface);
+  color: var(--olive);
+  font-family: "Consolas", "Courier New", monospace;
+  white-space: pre-wrap;
+}
+
+.comparison-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--stone);
+}
+
 .csv-title-cell {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1120,6 +1182,9 @@ textarea:focus {
   .csv-import-card,
   .csv-modal-header,
   .csv-grid-toolbar,
+  .week-comparison-grid,
+  .comparison-column-header,
+  .comparison-footer,
   .compact-actions,
   .csv-save-summary,
   .csv-result,
@@ -1140,6 +1205,10 @@ textarea:focus {
   .csv-modal {
     max-height: calc(100vh - 20px);
     padding: 14px;
+  }
+
+  .comparison-text {
+    min-height: 220px;
   }
 
   .csv-grid-actions,

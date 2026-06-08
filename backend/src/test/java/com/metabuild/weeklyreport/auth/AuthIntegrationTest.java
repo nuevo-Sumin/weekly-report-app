@@ -2,6 +2,7 @@ package com.metabuild.weeklyreport.auth;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metabuild.weeklyreport.auth.dto.LoginRequest;
 import com.metabuild.weeklyreport.auth.dto.SignupRequest;
 import com.metabuild.weeklyreport.user.entity.UserRole;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -52,7 +54,9 @@ class AuthIntegrationTest {
     void meReturnsUnauthorizedWithoutToken() throws Exception {
         mockMvc.perform(get("/api/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.success").value(false));
+                .andExpect(content().encoding(StandardCharsets.UTF_8))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("로그인이 필요합니다."));
     }
 
     @Test
@@ -60,7 +64,9 @@ class AuthIntegrationTest {
         mockMvc.perform(get("/api/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.success").value(false));
+                .andExpect(content().encoding(StandardCharsets.UTF_8))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("토큰이 유효하지 않거나 만료되었습니다."));
     }
 
     @Test

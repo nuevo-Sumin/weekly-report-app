@@ -93,6 +93,67 @@ export function buildAdminPreview(items, selectedIds) {
   return buildWeeklyReportText(selectedItems);
 }
 
+export function extractWeekSection(text, weekType) {
+  const rawText = String(text ?? '').trim();
+  if (!rawText) {
+    return { text: '', found: false };
+  }
+
+  const label = weekTypeLabels[weekType];
+  if (!label) {
+    return { text: rawText, found: false };
+  }
+
+  const lines = rawText.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => getWeekHeaderType(line) === weekType);
+  if (startIndex === -1) {
+    return { text: rawText, found: false };
+  }
+
+  const endIndex = lines.findIndex((line, index) => (
+    index > startIndex && getWeekHeaderType(line)
+  ));
+  const sectionLines = trimSectionBoundaryLines(lines.slice(startIndex + 1, endIndex === -1 ? undefined : endIndex));
+
+  return {
+    text: sectionLines.join('\n').trim(),
+    found: true,
+  };
+}
+
+function getWeekHeaderType(line) {
+  const normalized = String(line ?? '')
+    .trim()
+    .replace(/^#+\s*/, '')
+    .replace(/[：:]\s*$/, '')
+    .trim();
+
+  const bracketMatch = normalized.match(/^\[\s*(금주|차주)\s*\]$/);
+  const label = bracketMatch?.[1] ?? normalized.match(/^(금주|차주)$/)?.[1];
+
+  return Object.entries(weekTypeLabels)
+    .find(([, candidateLabel]) => candidateLabel === label)?.[0] ?? null;
+}
+
+function trimSectionBoundaryLines(lines) {
+  let startIndex = 0;
+  let endIndex = lines.length;
+
+  while (startIndex < endIndex && isSectionBoundaryLine(lines[startIndex])) {
+    startIndex += 1;
+  }
+  while (endIndex > startIndex && isSectionBoundaryLine(lines[endIndex - 1])) {
+    endIndex -= 1;
+  }
+
+  return lines.slice(startIndex, endIndex);
+}
+
+function isSectionBoundaryLine(line) {
+  const trimmed = line.trim();
+  return !trimmed || /^-{5,}$/.test(trimmed);
+}
+
 function appendItemBlocks(lines, items) {
   items.forEach((item) => lines.push(...buildItemBlock(item)));
 }

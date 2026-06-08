@@ -20,6 +20,12 @@ export function getWeekRange(dateValue) {
   };
 }
 
+export function getPreviousWeekRange(dateValue) {
+  const date = dateValue ? new Date(`${dateValue}T00:00:00`) : new Date();
+  date.setDate(date.getDate() - 7);
+  return getWeekRange(toDateInputValue(date));
+}
+
 export function formatDate(dateValue) {
   return dateValue.replaceAll('-', '.');
 }

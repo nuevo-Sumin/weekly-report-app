@@ -2,6 +2,7 @@ package com.metabuild.weeklyreport.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metabuild.weeklyreport.common.ApiResponse;
+import java.nio.charset.StandardCharsets;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpStatus.UNAUTHORIZED.value());
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
                             objectMapper.writeValue(response.getWriter(), ApiResponse.error("로그인이 필요합니다."));
                         }))
                 .authorizeHttpRequests(auth -> auth
