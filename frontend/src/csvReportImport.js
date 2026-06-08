@@ -86,9 +86,6 @@ function parseCsv(text) {
 
 function parseStatus(rawStatus, progressRate, rowNumber) {
   const status = String(rawStatus ?? '').trim().toUpperCase();
-  if (progressRate >= 100) {
-    return 'DONE';
-  }
   if (['신규', 'NEW'].includes(status)) {
     return 'NEW';
   }
@@ -100,6 +97,15 @@ function parseStatus(rawStatus, progressRate, rowNumber) {
   }
   if (['보류', 'HOLD'].includes(status)) {
     return 'HOLD';
+  }
+  if (['반려', 'REJECTED', 'REJECT'].includes(status)) {
+    return 'REJECTED';
+  }
+  if (['폐기', 'DISCARDED', 'DISCARD'].includes(status)) {
+    return 'DISCARDED';
+  }
+  if (progressRate >= 100) {
+    return 'DONE';
   }
   throw new Error(`${rowNumber}행의 상태 값이 올바르지 않습니다.`);
 }
@@ -238,7 +244,24 @@ export function parseReportCsvBufferWithErrors(buffer) {
 }
 
 export function filterCsvRowsForReportPeriod(rows, weekRange) {
+  const excludedStatusLabels = {
+    REJECTED: '반려',
+    DISCARDED: '폐기',
+  };
   const filtered = rows.reduce((acc, row) => {
+    if (excludedStatusLabels[row.status]) {
+      acc.skipped.push({
+        lineNumber: row.sourceRowNumber,
+        sourceKey: row.sourceKey,
+        title: row.title,
+        completedDate: row.completedDate,
+        status: row.status,
+        reason: 'STATUS_EXCLUDED',
+        message: `${row.sourceRowNumber}행의 ${excludedStatusLabels[row.status]} 상태 항목은 제외했습니다.`,
+      });
+      return acc;
+    }
+
     if (!row.completed && row.status !== 'DONE') {
       acc.rows.push(row);
       return acc;
@@ -254,6 +277,8 @@ export function filterCsvRowsForReportPeriod(rows, weekRange) {
       sourceKey: row.sourceKey,
       title: row.title,
       completedDate: row.completedDate,
+      status: row.status,
+      reason: 'COMPLETED_EXCLUDED',
       message: row.completedDate
         ? `${row.sourceRowNumber}행의 완료 항목은 보고기간 밖 완료일이라 제외했습니다.`
         : `${row.sourceRowNumber}행의 완료 항목은 완료일이 없어 제외했습니다.`,

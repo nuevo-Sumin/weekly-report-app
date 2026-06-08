@@ -134,6 +134,26 @@ const mixedCsv = [
 }
 
 {
+  const excludedStatusCsv = [
+    '#,제목,상태,범주,진척도,완료기한,완료일',
+    '1,반려 업무,반려,공통,100,2026-06-03,2026-06-03',
+    '2,폐기 업무,폐기,공통,50,2026-06-04,',
+    '3,정상 업무,진행중,공통,50,2026-06-05,',
+  ].join('\n');
+
+  const parsed = parseReportCsvWithErrors(excludedStatusCsv);
+  const result = filterCsvRowsForReportPeriod(parsed.rows, {
+    startDate: '2026-06-01',
+    endDate: '2026-06-05',
+  });
+
+  assert.equal(parsed.errors.length, 0);
+  assert.deepEqual(result.rows.map((row) => row.title), ['정상 업무']);
+  assert.deepEqual(result.skipped.map((row) => row.reason), ['STATUS_EXCLUDED', 'STATUS_EXCLUDED']);
+  assert.deepEqual(result.skipped.map((row) => row.status), ['REJECTED', 'DISCARDED']);
+}
+
+{
   const invalidCompletedDateCsv = [
     '#,제목,상태,범주,진척도,완료일',
     '1,완료일 오류,완료,공통,100,2026년 5월 27일',

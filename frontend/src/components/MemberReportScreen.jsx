@@ -49,9 +49,18 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
   const allCsvRowsSelected = csvRows.length > 0 && selectedCsvRowCount === csvRows.length;
   const csvSaveSuccessCount = useMemo(() => csvSaveResults.filter((result) => result.status === 'success').length, [csvSaveResults]);
   const csvSaveFailureCount = useMemo(() => csvSaveResults.filter((result) => result.status === 'error').length, [csvSaveResults]);
-  const csvCompletedExcludedResults = useMemo(() => csvValidationResults.filter((result) => result.status === 'warning'), [csvValidationResults]);
+  const csvCompletedExcludedResults = useMemo(
+    () => csvValidationResults.filter((result) => result.status === 'warning' && result.reason === 'COMPLETED_EXCLUDED'),
+    [csvValidationResults]
+  );
+  const csvStatusExcludedResults = useMemo(
+    () => csvValidationResults.filter((result) => result.status === 'warning' && result.reason === 'STATUS_EXCLUDED'),
+    [csvValidationResults]
+  );
   const csvValidationErrorResults = useMemo(() => csvValidationResults.filter((result) => result.status !== 'warning'), [csvValidationResults]);
   const csvCompletedExcludedCount = csvCompletedExcludedResults.length;
+  const csvStatusExcludedCount = csvStatusExcludedResults.length;
+  const csvExcludedCount = csvCompletedExcludedCount + csvStatusExcludedCount;
 
   useEffect(() => {
     if (token) {
@@ -195,8 +204,9 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
             sourceKey: skipped.sourceKey,
             sourceRowNumber: skipped.lineNumber,
             completedDate: skipped.completedDate,
+            reason: skipped.reason,
             weekType: null,
-            message: '기존 완료건',
+            message: skipped.message,
           })),
         ];
         setCsvValidationResults(validationResults);
@@ -733,7 +743,7 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
               <div>
                 <strong>{csvFileName || 'CSV 처리 결과'}</strong>
                 <span>
-                  가져올 행 {csvRows.length}건 · 선택 {selectedCsvRowCount}건 · 기존 완료건 {csvCompletedExcludedCount}건 · 오류 {csvValidationResults.length - csvCompletedExcludedCount}건
+                  가져올 행 {csvRows.length}건 · 선택 {selectedCsvRowCount}건 · 제외 {csvExcludedCount}건 · 오류 {csvValidationErrorResults.length}건
                   {csvSaveResults.length > 0 && ` · 저장 성공 ${csvSaveSuccessCount}건 · 저장 실패 ${csvSaveFailureCount}건`}
                 </span>
               </div>
@@ -768,8 +778,8 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                 <div className="summary-counts">
                   <span>가져올 행 {csvRows.length}</span>
                   <strong>선택 {selectedCsvRowCount}</strong>
-                  <span>기존 완료건 {csvCompletedExcludedCount}</span>
-                  <span>오류 {csvValidationResults.length - csvCompletedExcludedCount}</span>
+                  <span>제외 {csvExcludedCount}</span>
+                  <span>오류 {csvValidationErrorResults.length}</span>
                 </div>
                 <div className="button-row csv-grid-actions">
                   <button className="secondary-button" type="button" onClick={() => updateAllCsvRowsSelected(true)} disabled={csvRows.length === 0 || isLoading}>
@@ -881,6 +891,17 @@ function MemberReportScreen({ token, user, isLoading, setIsLoading, setMessage }
                         </div>
                       )}
                     </>
+                  )}
+                  {csvStatusExcludedCount > 0 && (
+                    <div className="csv-result-list" role="status" aria-live="polite">
+                      {csvStatusExcludedResults.map((result) => (
+                        <p key={result.key} className={`csv-result ${result.status}`}>
+                          <span className="csv-result-badge">제외</span>
+                          <span className="csv-result-title">{result.title}</span>
+                          <span className="csv-result-detail">{result.message}</span>
+                        </p>
+                      ))}
+                    </div>
                   )}
                   {csvValidationErrorResults.length > 0 && (
                     <div className="csv-result-list" role="status" aria-live="polite">
